@@ -12,4 +12,5 @@ public class CategoryRequest {
     private String name;
     private String slug;
     private String description;
+    private Long parentId;
 }
