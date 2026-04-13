@@ -4,10 +4,8 @@ import com.khait_academy.backend.dto.request.CategoryRequest;
 import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.CategoryResponse;
 import com.khait_academy.backend.services.CategoryService;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,91 +22,89 @@ public class CategoryController {
      * CREATE CATEGORY
      */
     @PostMapping
-    public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
+    public ResponseEntity<ApiResponse<CategoryResponse>> create(
             @RequestBody @Valid CategoryRequest request
     ) {
-
-        CategoryResponse category = categoryService.create(request);
-
-        return ResponseEntity.ok(
+        return ResponseEntity.status(201).body(
                 ApiResponse.<CategoryResponse>builder()
                         .success(true)
                         .message("Create category success")
-                        .data(category)
+                        .data(categoryService.create(request))
                         .build()
         );
     }
 
     /**
-     * GET ALL CATEGORIES
+     * GET ALL ROOT TREE
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
-
-        List<CategoryResponse> categories = categoryService.getAll();
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAll() {
 
         return ResponseEntity.ok(
                 ApiResponse.<List<CategoryResponse>>builder()
                         .success(true)
-                        .message("Get all categories success")
-                        .data(categories)
+                        .message("Get categories tree success")
+                        .data(categoryService.getAll())
                         .build()
         );
     }
 
     /**
-     *  GET CATEGORY BY ID
+     * GET BY ID
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryById(
+    public ResponseEntity<ApiResponse<CategoryResponse>> getById(
             @PathVariable Long id
     ) {
-
-        CategoryResponse category = categoryService.getById(id);
-
         return ResponseEntity.ok(
                 ApiResponse.<CategoryResponse>builder()
                         .success(true)
                         .message("Get category success")
-                        .data(category)
+                        .data(categoryService.getById(id))
                         .build()
         );
     }
 
     /**
-     *  UPDATE CATEGORY
+     * UPDATE
      */
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
+    public ResponseEntity<ApiResponse<CategoryResponse>> update(
             @PathVariable Long id,
             @RequestBody @Valid CategoryRequest request
     ) {
-
-        CategoryResponse category = categoryService.update(id, request);
-
         return ResponseEntity.ok(
                 ApiResponse.<CategoryResponse>builder()
                         .success(true)
                         .message("Update category success")
-                        .data(category)
+                        .data(categoryService.update(id, request))
                         .build()
         );
     }
 
     /**
-     *  DELETE CATEGORY
+     * DELETE (REST STANDARD = 204)
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteCategory(
+    public ResponseEntity<Void> delete(
             @PathVariable Long id
     ) {
-
         categoryService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 
+    /**
+     * GET CHILDREN
+     */
+    @GetMapping("/{id}/children")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getChildren(
+            @PathVariable Long id
+    ) {
         return ResponseEntity.ok(
-                ApiResponse.<Void>builder()
+                ApiResponse.<List<CategoryResponse>>builder()
                         .success(true)
-                        .message("Delete category success")
+                        .message("Get children success")
+                        .data(categoryService.getChildren(id))
                         .build()
         );
     }
