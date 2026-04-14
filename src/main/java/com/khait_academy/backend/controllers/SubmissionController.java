@@ -1,45 +1,47 @@
 package com.khait_academy.backend.controllers;
 
+import com.khait_academy.backend.dto.request.GradeRequest;
 import com.khait_academy.backend.dto.request.SubmissionRequest;
 import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.SubmissionResponse;
 import com.khait_academy.backend.services.SubmissionService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/api/submissions")
+@RequestMapping("/api/v1/submissions")
 @RequiredArgsConstructor
 public class SubmissionController {
 
     private final SubmissionService submissionService;
 
     /**
-     * ✅ SUBMIT (Student)
+     *  SUBMIT (Student)
      */
     @PostMapping
     public ResponseEntity<ApiResponse<SubmissionResponse>> submit(
-            @RequestBody @Valid SubmissionRequest request,
+            @Valid @RequestBody SubmissionRequest request,
             Authentication authentication
     ) {
-        SubmissionResponse response = submissionService.submit(request, authentication);
 
-        return ResponseEntity.ok(
-                ApiResponse.<SubmissionResponse>builder()
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.<SubmissionResponse>builder()
                         .success(true)
                         .message("Submit assignment success")
-                        .data(response)
-                        .build()
-        );
+                        .data(submissionService.submit(request, authentication))
+                        .build());
     }
 
     /**
-     * ✅ GET BY ID
+     * GET BY ID
      */
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<SubmissionResponse>> getById(@PathVariable Long id) {
@@ -54,63 +56,64 @@ public class SubmissionController {
     }
 
     /**
-     * ✅ GET BY ASSIGNMENT
+     * GET BY ASSIGNMENT (PAGINATION)
      */
     @GetMapping("/assignment/{assignmentId}")
-    public ResponseEntity<ApiResponse<List<SubmissionResponse>>> getByAssignment(
-            @PathVariable Long assignmentId
+    public ResponseEntity<ApiResponse<Page<SubmissionResponse>>> getByAssignment(
+            @PathVariable Long assignmentId,
+            Pageable pageable
     ) {
 
         return ResponseEntity.ok(
-                ApiResponse.<List<SubmissionResponse>>builder()
+                ApiResponse.<Page<SubmissionResponse>>builder()
                         .success(true)
                         .message("Get submissions by assignment success")
-                        .data(submissionService.getByAssignment(assignmentId))
+                        .data(submissionService.getByAssignment(assignmentId, pageable))
                         .build()
         );
     }
 
-    /**
-     * ✅ GET BY USER
+    /*
+     *  GET MY SUBMISSIONS (SECURE)
      */
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<ApiResponse<List<SubmissionResponse>>> getByUser(
-            @PathVariable Long userId
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<Page<SubmissionResponse>>> getMySubmissions(
+            Authentication authentication,
+            Pageable pageable
     ) {
 
         return ResponseEntity.ok(
-                ApiResponse.<List<SubmissionResponse>>builder()
+                ApiResponse.<Page<SubmissionResponse>>builder()
                         .success(true)
-                        .message("Get submissions by user success")
-                        .data(submissionService.getByUser(userId))
+                        .message("Get my submissions success")
+                        .data(submissionService.getMySubmissions(authentication, pageable))
                         .build()
         );
     }
 
     /**
-     * ✅ GRADE (Teacher/Admin)
+     *  GRADE (Teacher/Admin)
      */
     @PutMapping("/{id}/grade")
     public ResponseEntity<ApiResponse<SubmissionResponse>> grade(
             @PathVariable Long id,
-            @RequestParam Double score,
-            @RequestParam(required = false) String feedback
+            @Valid @RequestBody GradeRequest request
     ) {
 
         return ResponseEntity.ok(
                 ApiResponse.<SubmissionResponse>builder()
                         .success(true)
                         .message("Grade submission success")
-                        .data(submissionService.grade(id, score, feedback))
+                        .data(submissionService.grade(id, request.getScore(), request.getFeedback()))
                         .build()
         );
     }
 
     /**
-     * ✅ DELETE
+     *  DELETE
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
 
         submissionService.delete(id);
 
@@ -120,5 +123,5 @@ public class SubmissionController {
                         .message("Delete submission success")
                         .build()
         );
-    }
+        }
 }

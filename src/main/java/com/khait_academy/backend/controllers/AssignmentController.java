@@ -4,12 +4,17 @@ import com.khait_academy.backend.dto.request.AssignmentRequest;
 import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.AssignmentResponse;
 import com.khait_academy.backend.services.AssignmentService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/assignments")
@@ -19,56 +24,54 @@ public class AssignmentController {
     private final AssignmentService assignmentService;
 
     /**
-     *  CREATE ASSIGNMENT
+     * CREATE
      */
     @PostMapping
     public ResponseEntity<ApiResponse<AssignmentResponse>> create(
             @RequestBody @Valid AssignmentRequest request
     ) {
 
-        AssignmentResponse assignment = assignmentService.create(request);
-
-        return ResponseEntity.ok(
-                ApiResponse.<AssignmentResponse>builder()
-                        .success(true)
-                        .message("Create assignment success")
-                        .data(assignment)
-                        .build()
-        );
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(
+                        ApiResponse.<AssignmentResponse>builder()
+                                .success(true)
+                                .message("Create assignment success")
+                                .data(assignmentService.create(request))
+                                .build()
+                );
     }
 
     /**
-     *  GET ASSIGNMENTS BY LESSON
-     */
-    @GetMapping("/lesson/{lessonId}")
-    public ResponseEntity<ApiResponse<List<AssignmentResponse>>> getByLesson(
-            @PathVariable Long lessonId
-    ) {
-
-        List<AssignmentResponse> assignments = assignmentService.getByLesson(lessonId);
-
-        return ResponseEntity.ok(
-                ApiResponse.<List<AssignmentResponse>>builder()
-                        .success(true)
-                        .message("Get assignments by lesson success")
-                        .data(assignments)
-                        .build()
-        );
-    }
-
-    /**
-     *  GET ALL (OPTIONAL - nếu bạn thêm service)
+     *  GET ALL (pagination)
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<AssignmentResponse>>> getAll() {
-
-        List<AssignmentResponse> assignments = assignmentService.getAll();
+    public ResponseEntity<ApiResponse<Page<AssignmentResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "id") Pageable pageable
+    ) {
 
         return ResponseEntity.ok(
-                ApiResponse.<List<AssignmentResponse>>builder()
+                ApiResponse.<Page<AssignmentResponse>>builder()
                         .success(true)
                         .message("Get all assignments success")
-                        .data(assignments)
+                        .data(assignmentService.getAll(pageable))
+                        .build()
+        );
+    }
+
+    /**
+     *  GET BY LESSON (pagination)
+     */
+    @GetMapping("/lesson/{lessonId}")
+    public ResponseEntity<ApiResponse<Page<AssignmentResponse>>> getByLesson(
+            @PathVariable Long lessonId,
+            @PageableDefault(size = 10, sort = "id") Pageable pageable
+    ) {
+
+        return ResponseEntity.ok(
+                ApiResponse.<Page<AssignmentResponse>>builder()
+                        .success(true)
+                        .message("Get assignments by lesson success")
+                        .data(assignmentService.getByLesson(lessonId, pageable))
                         .build()
         );
     }
@@ -81,13 +84,11 @@ public class AssignmentController {
             @PathVariable Long id
     ) {
 
-        AssignmentResponse assignment = assignmentService.getById(id);
-
         return ResponseEntity.ok(
                 ApiResponse.<AssignmentResponse>builder()
                         .success(true)
                         .message("Get assignment success")
-                        .data(assignment)
+                        .data(assignmentService.getById(id))
                         .build()
         );
     }
@@ -101,13 +102,11 @@ public class AssignmentController {
             @RequestBody @Valid AssignmentRequest request
     ) {
 
-        AssignmentResponse assignment = assignmentService.update(id, request);
-
         return ResponseEntity.ok(
                 ApiResponse.<AssignmentResponse>builder()
                         .success(true)
                         .message("Update assignment success")
-                        .data(assignment)
+                        .data(assignmentService.update(id, request))
                         .build()
         );
     }
@@ -122,11 +121,12 @@ public class AssignmentController {
 
         assignmentService.delete(id);
 
-        return ResponseEntity.ok(
-                ApiResponse.<Void>builder()
-                        .success(true)
-                        .message("Delete assignment success")
-                        .build()
-        );
+        return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                .body(
+                        ApiResponse.<Void>builder()
+                                .success(true)
+                                .message("Delete assignment success")
+                                .build()
+                );
     }
 }

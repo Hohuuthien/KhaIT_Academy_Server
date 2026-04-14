@@ -10,13 +10,16 @@ import com.khait_academy.backend.mapper.SubmissionMapper;
 import com.khait_academy.backend.repositories.AssignmentRepository;
 import com.khait_academy.backend.repositories.SubmissionRepository;
 import com.khait_academy.backend.repositories.UserRepository;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -28,11 +31,10 @@ public class SubmissionService {
     private final AssignmentRepository assignmentRepository;
 
     /**
-     * ✅ SUBMIT (JWT - không dùng userId)
+     * ✅ SUBMIT (UPSERT + JWT)
      */
     public SubmissionResponse submit(SubmissionRequest request, Authentication authentication) {
 
-        // lấy email từ JWT
         String email = authentication.getName();
 
         User user = userRepository.findByEmail(email)
@@ -42,8 +44,8 @@ public class SubmissionService {
                 .orElseThrow(() -> new RuntimeException("Assignment not found"));
 
         Submission submission = submissionRepository
-                .findByUserIdAndAssignmentId(user.getId(), assignment.getId())
-                .orElse(Submission.builder()
+                .findByUser_IdAndAssignment_Id(user.getId(), assignment.getId())
+                .orElseGet(() -> Submission.builder()
                         .user(user)
                         .assignment(assignment)
                         .build()
@@ -52,7 +54,7 @@ public class SubmissionService {
         submission.setFileUrl(request.getFileUrl());
         submission.setSubmittedAt(LocalDateTime.now());
 
-        // check deadline
+        // ⛔ business rule: deadline check
         if (assignment.getDueDate() != null &&
                 LocalDateTime.now().isAfter(assignment.getDueDate())) {
             submission.setStatus(SubmissionStatus.LATE);
@@ -60,9 +62,9 @@ public class SubmissionService {
             submission.setStatus(SubmissionStatus.SUBMITTED);
         }
 
-        submissionRepository.save(submission);
+        Submission saved = submissionRepository.save(submission);
 
-        return SubmissionMapper.toResponse(submission);
+        return SubmissionMapper.toResponse(saved);
     }
 
     /**
@@ -70,6 +72,7 @@ public class SubmissionService {
      */
     @Transactional(readOnly = true)
     public SubmissionResponse getById(Long id) {
+
         Submission submission = submissionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Submission not found"));
 
@@ -77,35 +80,45 @@ public class SubmissionService {
     }
 
     /**
-     * ✅ GET BY ASSIGNMENT
+     * ✅ GET BY ASSIGNMENT (PAGINATION FIXED)
      */
     @Transactional(readOnly = true)
-    public List<SubmissionResponse> getByAssignment(Long assignmentId) {
+    public Page<SubmissionResponse> getByAssignment(Long assignmentId, Pageable pageable) {
 
         if (!assignmentRepository.existsById(assignmentId)) {
             throw new RuntimeException("Assignment not found");
         }
 
-        return submissionRepository.findByAssignmentId(assignmentId)
-                .stream()
-                .map(SubmissionMapper::toResponse)
-                .toList();
+        return submissionRepository
+                .findByAssignment_Id(assignmentId, pageable)
+                .map(SubmissionMapper::toResponse);
+    }
+    @Transactional(readOnly = true)
+    public Page<SubmissionResponse> getMySubmissions(Authentication authentication, Pageable pageable) {
+
+        String email = authentication.getName();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return submissionRepository
+                .findByUser_Id(user.getId(), pageable)
+                .map(SubmissionMapper::toResponse);
     }
 
     /**
-     * ✅ GET BY USER
+     * ✅ GET BY USER (PAGINATION)
      */
     @Transactional(readOnly = true)
-    public List<SubmissionResponse> getByUser(Long userId) {
+    public Page<SubmissionResponse> getByUser(Long userId, Pageable pageable) {
 
         if (!userRepository.existsById(userId)) {
             throw new RuntimeException("User not found");
         }
 
-        return submissionRepository.findByUserId(userId)
-                .stream()
-                .map(SubmissionMapper::toResponse)
-                .toList();
+        return submissionRepository
+                .findByUser_Id(userId, pageable)
+                .map(SubmissionMapper::toResponse);
     }
 
     /**
@@ -126,9 +139,9 @@ public class SubmissionService {
         submission.setFeedback(feedback);
         submission.setStatus(SubmissionStatus.GRADED);
 
-        submissionRepository.save(submission);
+        Submission saved = submissionRepository.save(submission);
 
-        return SubmissionMapper.toResponse(submission);
+        return SubmissionMapper.toResponse(saved);
     }
 
     /**

@@ -7,14 +7,19 @@ import com.khait_academy.backend.entities.Lesson;
 import com.khait_academy.backend.mapper.AssignmentMapper;
 import com.khait_academy.backend.repositories.AssignmentRepository;
 import com.khait_academy.backend.repositories.LessonRepository;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class AssignmentService {
 
     private final AssignmentRepository assignmentRepository;
@@ -38,24 +43,22 @@ public class AssignmentService {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        assignmentRepository.save(assignment);
-
-        return AssignmentMapper.toResponse(assignment);
+        return AssignmentMapper.toResponse(assignmentRepository.save(assignment));
     }
 
     /**
-     * ✅ GET ALL
+     * ✅ GET ALL (pagination)
      */
-    public List<AssignmentResponse> getAll() {
-        return assignmentRepository.findAll()
-                .stream()
-                .map(AssignmentMapper::toResponse)
-                .toList();
+    @Transactional(readOnly = true)
+    public Page<AssignmentResponse> getAll(Pageable pageable) {
+        return assignmentRepository.findAll(pageable)
+                .map(AssignmentMapper::toResponse);
     }
 
     /**
      * ✅ GET BY ID
      */
+    @Transactional(readOnly = true)
     public AssignmentResponse getById(Long id) {
         Assignment assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Assignment not found"));
@@ -64,19 +67,15 @@ public class AssignmentService {
     }
 
     /**
-     * ✅ GET BY LESSON
+     * ✅ GET BY LESSON (FIX LAZY)
      */
-    public List<AssignmentResponse> getByLesson(Long lessonId) {
+    @Transactional(readOnly = true)
+    public Page<AssignmentResponse> getByLesson(Long lessonId, Pageable pageable) {
 
-        // check lesson tồn tại (best practice)
-        if (!lessonRepository.existsById(lessonId)) {
-            throw new RuntimeException("Lesson not found");
-        }
+        // ❗ KHÔNG cần existsById → tránh query thừa
 
-        return assignmentRepository.findByLessonId(lessonId)
-                .stream()
-                .map(AssignmentMapper::toResponse)
-                .toList();
+        return assignmentRepository.findByLesson_Id(lessonId, pageable)
+                .map(AssignmentMapper::toResponse);
     }
 
     /**
@@ -97,9 +96,7 @@ public class AssignmentService {
         assignment.setMaxScore(request.getMaxScore());
         assignment.setUpdatedAt(LocalDateTime.now());
 
-        assignmentRepository.save(assignment);
-
-        return AssignmentMapper.toResponse(assignment);
+        return AssignmentMapper.toResponse(assignmentRepository.save(assignment));
     }
 
     /**
@@ -107,10 +104,9 @@ public class AssignmentService {
      */
     public void delete(Long id) {
 
-        if (!assignmentRepository.existsById(id)) {
-            throw new RuntimeException("Assignment not found");
-        }
+        Assignment assignment = assignmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Assignment not found"));
 
-        assignmentRepository.deleteById(id);
+        assignmentRepository.delete(assignment);
     }
 }
