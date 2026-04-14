@@ -13,14 +13,14 @@ import java.time.LocalDateTime;
 public class AttendanceResponse {
 
     private Long id;
+
     private Long userId;
-    private String userName;
+    private String userName;     // ✅ thêm dòng này
 
     private Long lessonId;
-    private String lessonTitle;
+    private String lessonTitle;  // ✅ thêm dòng này
 
     private AttendanceStatus status;
     private LocalDateTime attendedAt;
-
     private String note;
 }

@@ -10,7 +10,11 @@ import java.time.LocalDateTime;
 @Table(
     name = "attendances",
     uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "lesson_id"})
+        @UniqueConstraint(name = "uk_user_lesson", columnNames = {"user_id", "lesson_id"})
+    },
+    indexes = {
+        @Index(name = "idx_attendance_user", columnList = "user_id"),
+        @Index(name = "idx_attendance_lesson", columnList = "lesson_id")
     }
 )
 @Getter
@@ -24,19 +28,30 @@ public class Attendance {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    // LAZY để tránh load thừa
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private AttendanceStatus status;
 
+    @Column(nullable = false)
     private LocalDateTime attendedAt;
+
+    @Column(length = 500)
     private String note;
+
+    // Tự set timestamp khi insert
+    @PrePersist
+    public void prePersist() {
+        if (this.attendedAt == null) {
+            this.attendedAt = LocalDateTime.now();
+        }
+    }
 }

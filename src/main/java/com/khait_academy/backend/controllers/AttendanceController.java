@@ -4,11 +4,15 @@ import com.khait_academy.backend.dto.request.AttendanceRequest;
 import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.AttendanceResponse;
 import com.khait_academy.backend.services.AttendanceService;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/attendances")
@@ -18,56 +22,67 @@ public class AttendanceController {
     private final AttendanceService attendanceService;
 
     /**
-     *  CHECK-IN
+     * CHECK-IN / UPDATE
      */
     @PostMapping
     public ResponseEntity<ApiResponse<AttendanceResponse>> checkIn(
-            @RequestBody AttendanceRequest request
+            @Valid @RequestBody AttendanceRequest request
     ) {
 
-        return ResponseEntity.ok(
-                ApiResponse.<AttendanceResponse>builder()
-                        .success(true)
-                        .message("Check-in success")
-                        .data(attendanceService.checkIn(request))
-                        .build()
-        );
+        AttendanceResponse response = attendanceService.checkIn(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(
+                        ApiResponse.<AttendanceResponse>builder()
+                                .success(true)
+                                .message("Check-in success")
+                                .data(response)
+                                .build()
+                );
     }
 
     /**
-     *  GET BY LESSON
+     * GET BY LESSON (PAGINATION) 🔥
      */
     @GetMapping("/lesson/{lessonId}")
-    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getByLesson(
-            @PathVariable Long lessonId
+    public ResponseEntity<ApiResponse<Page<AttendanceResponse>>> getByLesson(
+            @PathVariable Long lessonId,
+            Pageable pageable
     ) {
 
+        Page<AttendanceResponse> page = attendanceService.getByLesson(lessonId, pageable);
+
         return ResponseEntity.ok(
-                ApiResponse.<List<AttendanceResponse>>builder()
+                ApiResponse.<Page<AttendanceResponse>>builder()
                         .success(true)
-                        .data(attendanceService.getByLesson(lessonId))
+                        .message("Get attendance by lesson success")
+                        .data(page)
                         .build()
         );
     }
 
     /**
-     *  GET BY USER
+     * GET BY USER (PAGINATION) 🔥
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<ApiResponse<List<AttendanceResponse>>> getByUser(
-            @PathVariable Long userId
+    public ResponseEntity<ApiResponse<Page<AttendanceResponse>>> getByUser(
+            @PathVariable Long userId,
+            Pageable pageable
     ) {
 
+        Page<AttendanceResponse> page = attendanceService.getByUser(userId, pageable);
+
         return ResponseEntity.ok(
-                ApiResponse.<List<AttendanceResponse>>builder()
+                ApiResponse.<Page<AttendanceResponse>>builder()
                         .success(true)
-                        .data(attendanceService.getByUser(userId))
+                        .message("Get attendance by user success")
+                        .data(page)
                         .build()
         );
     }
 
     /**
-     *  DELETE
+     * DELETE
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(
@@ -76,10 +91,12 @@ public class AttendanceController {
 
         attendanceService.delete(id);
 
-        return ResponseEntity.ok(
-                ApiResponse.<Void>builder()
-                        .success(true)
-                        .build()
-        );
+        return ResponseEntity.status(HttpStatus.NO_CONTENT)
+                .body(
+                        ApiResponse.<Void>builder()
+                                .success(true)
+                                .message("Delete attendance success")
+                                .build()
+                );
     }
 }

@@ -1,37 +1,35 @@
 package com.khait_academy.backend.repositories;
 
 import com.khait_academy.backend.entities.Submission;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.*;
+
 import java.util.Optional;
 
 public interface SubmissionRepository extends JpaRepository<Submission, Long> {
 
     /**
-     *  Tìm bài nộp theo user + assignment (dùng cho submit/update)
+     * ✅ Tìm submission theo user + assignment (UPSERT)
      */
-    Optional<Submission> findByUserIdAndAssignmentId(Long userId, Long assignmentId);
+    @EntityGraph(attributePaths = {"user", "assignment"})
+    Optional<Submission> findByUser_IdAndAssignment_Id(Long userId, Long assignmentId);
 
     /**
-     *  Lấy tất cả bài nộp theo assignment (FETCH JOIN tránh lazy)
+     * ✅ Lấy danh sách theo assignment (có pagination)
      */
-    @Query("""
-        SELECT s FROM Submission s
-        JOIN FETCH s.user
-        JOIN FETCH s.assignment
-        WHERE s.assignment.id = :assignmentId
-    """)
-    List<Submission> findByAssignmentId(Long assignmentId);
+    @EntityGraph(attributePaths = {"user", "assignment"})
+    Page<Submission> findByAssignment_Id(Long assignmentId, Pageable pageable);
 
     /**
-     *  Lấy tất cả bài nộp theo user
+     * ✅ Lấy danh sách theo user (có pagination)
      */
-    @Query("""
-        SELECT s FROM Submission s
-        JOIN FETCH s.assignment
-        WHERE s.user.id = :userId
-    """)
-    List<Submission> findByUserId(Long userId);
+    @EntityGraph(attributePaths = {"assignment"})
+    Page<Submission> findByUser_Id(Long userId, Pageable pageable);
+
+    /**
+     * ✅ (Optional) Check tồn tại
+     */
+    boolean existsByUser_IdAndAssignment_Id(Long userId, Long assignmentId);
 }
