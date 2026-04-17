@@ -16,4 +16,4 @@ jobs:
           -d '{
             "content": "🚀 New push by ${{ github.actor }} in ${{ github.repository }}"
           }' \
-          ${{ secrets.DISCORD_WEBHOOK }}
+          ${{ secrets.DISCORD_WEBHOOK_BE }}
