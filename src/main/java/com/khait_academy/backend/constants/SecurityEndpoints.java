@@ -17,7 +17,9 @@ public class SecurityEndpoints {
     public static final String[] ENROLLMENT = {
         "/api/enrollments/**"
     };
-
+    public static final String[] STUDENT ={
+        "/api/students/**"
+    };
     // ===== ADMIN =====
     public static final String ADMIN = "/api/admin/**";
 
