@@ -15,18 +15,18 @@ import java.util.Set;
 public class UserRequest {
 
     @Email(message = "Email không hợp lệ")
-    @NotBlank(message = "Email không được bỏ trống")
+    @NotBlank
     private String email;
 
-    @NotBlank(message = "Password không được bỏ trống")
-    @Size(min = 6, message = "Password phải ít nhất 6 ký tự")
+    @NotBlank
+    @Size(min = 6)
     private String password;
 
-    @NotBlank(message = "Full name không được bỏ trống")
+    @NotBlank
     private String fullName;
 
     private String avatarUrl;
 
-    // dùng để gán role (VD: ADMIN, USER, STUDENT)
-    private Set<String> roles;
+    // ROLE chuẩn hệ thống (ADMIN / TEACHER / STUDENT / PARENT)
+    private Set<Long> roleIds;
 }

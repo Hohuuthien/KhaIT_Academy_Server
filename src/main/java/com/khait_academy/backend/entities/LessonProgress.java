@@ -1,8 +1,10 @@
 package com.khait_academy.backend.entities;
 
+import com.khait_academy.backend.common.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -11,13 +13,13 @@ import java.time.LocalDateTime;
     name = "lesson_progress",
     uniqueConstraints = {
         @UniqueConstraint(
-            name = "uk_user_lesson",
-            columnNames = {"user_id", "lesson_id"}
+            name = "uk_student_lesson",
+            columnNames = {"student_id", "lesson_id"}
         )
     },
     indexes = {
-        @Index(name = "idx_user", columnList = "user_id"),
-        @Index(name = "idx_lesson", columnList = "lesson_id")
+        @Index(name = "idx_lp_student", columnList = "student_id"),
+        @Index(name = "idx_lp_lesson", columnList = "lesson_id")
     }
 )
 @Getter
@@ -25,31 +27,64 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LessonProgress {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class LessonProgress extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
-    // user
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    // ===== RELATION =====
 
-    // lesson
-    @ManyToOne(fetch = FetchType.LAZY)
+    // 🔥 FIX QUAN TRỌNG: dùng Student thay vì User
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "student_id", nullable = false)
+    @JsonIgnore
+    private Student student;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "lesson_id", nullable = false)
+    @JsonIgnore
     private Lesson lesson;
 
-    @Column(nullable = false)
-    private boolean completed;
+    // ===== PROGRESS =====
 
+    @Builder.Default
     @Column(nullable = false)
-    private Double progress; // 0 → 100
+    private Boolean completed = false;
 
+    // 🔥 dùng int thay vì Double (0–100)
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer progress = 0;
+
+    // vị trí video (giây)
     @Column(name = "last_position")
-    private Long lastPosition;
+    private Integer lastPosition;
 
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
+    @Column(name = "last_accessed_at")
+    private LocalDateTime lastAccessedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    // ===== LIFECYCLE =====
+
+    @PrePersist
+    public void prePersist() {
+        if (progress == null) progress = 0;
+        if (completed == null) completed = false;
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.lastAccessedAt = LocalDateTime.now();
+
+        // auto complete
+        if (progress != null && progress == 100 && !completed) {
+            this.completed = true;
+            this.completedAt = LocalDateTime.now();
+        }
+    }
 }

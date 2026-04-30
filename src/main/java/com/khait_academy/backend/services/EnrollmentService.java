@@ -1,20 +1,19 @@
 package com.khait_academy.backend.services;
 
+import com.khait_academy.backend.dto.request.EnrollmentRequest;
 import com.khait_academy.backend.dto.response.EnrollmentResponse;
 import com.khait_academy.backend.entities.Course;
 import com.khait_academy.backend.entities.Enrollment;
-import com.khait_academy.backend.entities.User;
+import com.khait_academy.backend.entities.Student;
 import com.khait_academy.backend.exception.BadRequestException;
 import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.EnrollmentMapper;
 import com.khait_academy.backend.repositories.CourseRepository;
 import com.khait_academy.backend.repositories.EnrollmentRepository;
-import com.khait_academy.backend.repositories.UserRepository;
+import com.khait_academy.backend.repositories.StudentRepository;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,122 +21,102 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
-@Transactional(readOnly = true)
+@Transactional
 public class EnrollmentService {
 
     private final EnrollmentRepository enrollmentRepository;
-    private final UserRepository userRepository;
+    private final StudentRepository studentRepository;
     private final CourseRepository courseRepository;
 
-    // ================= PRIVATE =================
+    // ================= CREATE =================
+    public EnrollmentResponse create(EnrollmentRequest request) {
 
-    private User getUser(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-    }
-
-    private User getUserByEmail(String email) {
-        validateEmail(email);
-
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-    }
-
-    private Course getCourse(Long courseId) {
-        return courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
-    }
-
-    private void validateEmail(String email) {
-        if (email == null || email.isBlank()) {
-            throw new BadRequestException("Email không hợp lệ");
-        }
-    }
-
-    private void validateIds(Long userId, Long courseId) {
-        if (userId == null || courseId == null) {
-            throw new BadRequestException("UserId và CourseId không được null");
-        }
-    }
-
-    // ================= WRITE =================
-
-    @Transactional
-    public EnrollmentResponse enroll(Long userId, Long courseId) {
-
-        validateIds(userId, courseId);
-
-        // ✅ check trước (UX tốt hơn)
-        if (enrollmentRepository.existsByUser_IdAndCourse_Id(userId, courseId)) {
-            throw new BadRequestException("Bạn đã đăng ký khóa học này rồi");
+        if (enrollmentRepository.existsByStudent_IdAndCourse_Id(
+                request.getStudentId(),
+                request.getCourseId()
+        )) {
+            throw new BadRequestException("Student already enrolled in this course");
         }
 
-        User user = getUser(userId);
-        Course course = getCourse(courseId);
+        Student student = studentRepository.findById(request.getStudentId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Student not found")
+                );
 
-        Enrollment enrollment = Enrollment.builder()
-                .user(user)
-                .course(course)
-                .completed(false)
-                .build(); // 👉 dùng @PrePersist set enrolledAt
+        Course course = courseRepository.findById(request.getCourseId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Course not found")
+                );
 
-        try {
-            Enrollment saved = enrollmentRepository.save(enrollment);
+        Enrollment enrollment = EnrollmentMapper.toEntity(request, student, course);
 
-            log.info("Enroll success: userId={}, courseId={}", userId, courseId);
-
-            return EnrollmentMapper.toResponse(saved);
-
-        } catch (DataIntegrityViolationException e) {
-            log.warn("Duplicate enrollment (race condition): userId={}, courseId={}", userId, courseId);
-            throw new BadRequestException("Bạn đã đăng ký khóa học này rồi");
-        }
+        return EnrollmentMapper.toResponse(
+                enrollmentRepository.save(enrollment)
+        );
     }
 
-    @Transactional
-    public EnrollmentResponse enrollByEmail(String email, Long courseId) {
-        User user = getUserByEmail(email);
-        return enroll(user.getId(), courseId);
-    }
-
-    // ================= READ =================
-
-    public List<EnrollmentResponse> getMyCourses(Long userId) {
-
-        if (userId == null) {
-            throw new BadRequestException("UserId không hợp lệ");
-        }
-
-        log.debug("Fetching courses for userId={}", userId);
-
-        return enrollmentRepository.findByUser_IdOrderByEnrolledAtDesc(userId)
+    // ================= GET ALL =================
+    @Transactional(readOnly = true)
+    public List<EnrollmentResponse> getAll() {
+        return enrollmentRepository.findAll()
                 .stream()
                 .map(EnrollmentMapper::toResponse)
                 .toList();
     }
 
-    public List<EnrollmentResponse> getMyCoursesByEmail(String email) {
-        User user = getUserByEmail(email);
-        return getMyCourses(user.getId());
+    // ================= GET BY ID =================
+    @Transactional(readOnly = true)
+    public EnrollmentResponse getById(Long id) {
+
+        Enrollment enrollment = enrollmentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Enrollment not found")
+                );
+
+        return EnrollmentMapper.toResponse(enrollment);
     }
 
-    public boolean isEnrolled(Long userId, Long courseId) {
+    // ================= UPDATE =================
+    public EnrollmentResponse update(Long id, EnrollmentRequest request) {
 
-        if (userId == null || courseId == null) return false;
+        Enrollment enrollment = enrollmentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Enrollment not found")
+                );
 
-        return enrollmentRepository.existsByUser_IdAndCourse_Id(userId, courseId);
+        EnrollmentMapper.updateEntity(enrollment, request);
+
+        return EnrollmentMapper.toResponse(
+                enrollmentRepository.save(enrollment)
+        );
     }
 
-    public boolean isEnrolledByEmail(String email, Long courseId) {
-        User user = getUserByEmail(email);
-        return isEnrolled(user.getId(), courseId);
+    // ================= DELETE =================
+    public void delete(Long id) {
+
+        Enrollment enrollment = enrollmentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Enrollment not found")
+                );
+
+        enrollmentRepository.delete(enrollment);
     }
 
-    // ================= ADMIN =================
+    // ================= BY STUDENT =================
+    @Transactional(readOnly = true)
+    public List<EnrollmentResponse> getByStudent(Long studentId) {
 
-    public List<EnrollmentResponse> getAll() {
-        return enrollmentRepository.findAllByOrderByEnrolledAtDesc()
+        return enrollmentRepository.findByStudent_Id(studentId)
+                .stream()
+                .map(EnrollmentMapper::toResponse)
+                .toList();
+    }
+
+    // ================= BY COURSE =================
+    @Transactional(readOnly = true)
+    public List<EnrollmentResponse> getByCourse(Long courseId) {
+
+        return enrollmentRepository.findByCourse_Id(courseId)
                 .stream()
                 .map(EnrollmentMapper::toResponse)
                 .toList();

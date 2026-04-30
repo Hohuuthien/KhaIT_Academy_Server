@@ -1,22 +1,36 @@
 package com.khait_academy.backend.dto.response;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Data
+@Getter
 @Builder
 public class EnrollmentResponse {
 
     private Long id;
 
+    // student
+    private Long studentId;
+    private String studentName;
+
+    // course
     private Long courseId;
     private String courseTitle;
-    private String courseThumbnail;
-    private Double coursePrice;
 
+    // business
     private LocalDateTime enrolledAt;
+    private BigDecimal priceAtPurchase;
 
-    private boolean completed;
+    private Integer progress;
+    private String status;
+
+    private LocalDateTime completedAt;
+    private LocalDateTime expiredAt;
+
+    // audit
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

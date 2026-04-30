@@ -2,9 +2,7 @@ package com.khait_academy.backend.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.*;
 
 import java.util.List;
 
@@ -16,25 +14,35 @@ public class CorsConfig {
 
         CorsConfiguration config = new CorsConfiguration();
 
-        // Cho phép frontend (React)
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000",   // React local
-                "http://localhost:5173"    // Vite
+        // ===== ORIGINS =====
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "https://*.khait-academy.com" // production domain
         ));
 
-        // Cho phép method
+        // ===== METHODS =====
         config.setAllowedMethods(List.of(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS"
         ));
 
-        // Cho phép header
-        config.setAllowedHeaders(List.of("*"));
+        // ===== HEADERS =====
+        config.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "X-Requested-With"
+        ));
 
-        // Cho phép gửi token (Authorization)
+        // ===== EXPOSE =====
+        config.setExposedHeaders(List.of(
+                "Authorization"
+        ));
+
+        // ===== CREDENTIAL =====
         config.setAllowCredentials(true);
 
-        //Expose header cho frontend đọc
-        config.setExposedHeaders(List.of("Authorization"));
+        // ===== CACHE PREFLIGHT =====
+        config.setMaxAge(3600L); // 1h
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

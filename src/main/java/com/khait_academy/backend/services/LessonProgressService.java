@@ -2,14 +2,13 @@ package com.khait_academy.backend.services;
 
 import com.khait_academy.backend.dto.request.LessonProgressRequest;
 import com.khait_academy.backend.dto.response.LessonProgressResponse;
-import com.khait_academy.backend.entities.Lesson;
-import com.khait_academy.backend.entities.LessonProgress;
-import com.khait_academy.backend.entities.User;
+import com.khait_academy.backend.entities.*;
+import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.LessonProgressMapper;
-import com.khait_academy.backend.repositories.LessonProgressRepository;
-import com.khait_academy.backend.repositories.LessonRepository;
-import com.khait_academy.backend.repositories.UserRepository;
+import com.khait_academy.backend.repositories.*;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,81 +16,68 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class LessonProgressService {
 
-    private final LessonProgressRepository progressRepository;
-    private final UserRepository userRepository;
+    private final LessonProgressRepository lessonProgressRepository;
+    private final StudentRepository studentRepository;
     private final LessonRepository lessonRepository;
 
-    // ================= UPDATE PROGRESS =================
-    @Transactional
-    public LessonProgressResponse updateProgress(String email, LessonProgressRequest request) {
+    // ================= CREATE / UPDATE (UPSERT) =================
+    public LessonProgressResponse saveOrUpdate(LessonProgressRequest request) {
 
-        // 1. lấy user
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        Student student = studentRepository.findById(request.getStudentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
 
-        // 2. lấy lesson
         Lesson lesson = lessonRepository.findById(request.getLessonId())
-                .orElseThrow(() -> new RuntimeException("Lesson not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
 
-        // 3. tìm progress
-        LessonProgress progress = progressRepository
-                .findByUserAndLesson(user, lesson)
-                .orElse(null);
+        LessonProgress lp = lessonProgressRepository
+                .findByStudentIdAndLessonId(request.getStudentId(), request.getLessonId())
+                .orElse(LessonProgress.builder()
+                        .student(student)
+                        .lesson(lesson)
+                        .build());
 
-        // 4. create hoặc update
-        if (progress == null) {
-            progress = LessonProgressMapper.toEntity(request, user, lesson);
-        } else {
-            LessonProgressMapper.updateEntity(progress, request);
+        if (request.getProgress() != null) {
+            lp.setProgress(request.getProgress());
         }
 
-        // 5. save
-        progressRepository.save(progress);
+        if (request.getLastPosition() != null) {
+            lp.setLastPosition(request.getLastPosition());
+        }
 
-        // 6. trả response
-        return LessonProgressMapper.toResponse(progress);
+        return LessonProgressMapper.toResponse(
+                lessonProgressRepository.save(lp)
+        );
     }
 
-    // ================= GET PROGRESS BY COURSE =================
+    // ================= GET BY STUDENT =================
     @Transactional(readOnly = true)
-    public List<LessonProgressResponse> getProgressByCourse(String email, Long courseId) {
+    public List<LessonProgressResponse> getByStudent(Long studentId) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return progressRepository
-                .findByUserAndLesson_Course_Id(user, courseId)
+        return lessonProgressRepository.findByStudentId(studentId)
                 .stream()
                 .map(LessonProgressMapper::toResponse)
                 .toList();
     }
 
-    // ================= GET PROGRESS BY LESSON =================
+    // ================= GET BY LESSON =================
     @Transactional(readOnly = true)
-    public LessonProgressResponse getProgressByLesson(String email, Long lessonId) {
+    public List<LessonProgressResponse> getByLesson(Long lessonId) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        return lessonProgressRepository.findByLessonId(lessonId)
+                .stream()
+                .map(LessonProgressMapper::toResponse)
+                .toList();
+    }
 
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new RuntimeException("Lesson not found"));
+    // ================= DELETE =================
+    public void delete(Long id) {
 
-        LessonProgress progress = progressRepository
-                .findByUserAndLesson(user, lesson)
-                .orElse(null);
+        LessonProgress lp = lessonProgressRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("LessonProgress not found"));
 
-        if (progress == null) {
-            // chưa học → trả default
-            return LessonProgressResponse.builder()
-                    .lessonId(lessonId)
-                    .progress(0.0)
-                    .completed(false)
-                    .lastPosition(0L)
-                    .build();
-        }
-
-        return LessonProgressMapper.toResponse(progress);
+        lessonProgressRepository.delete(lp);
     }
 }

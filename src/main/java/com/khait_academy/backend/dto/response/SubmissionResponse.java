@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.khait_academy.backend.enums.SubmissionStatus;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -12,26 +13,34 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL) // bỏ field null khi trả về JSON
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class SubmissionResponse {
 
+    // ===== IDENTIFIER =====
     private Long id;
 
-    private Long userId;
-    private String userName;
+    // ===== STUDENT =====
+    private Long studentId;
+    private String studentName;
 
+    // ===== ASSIGNMENT =====
     private Long assignmentId;
     private String assignmentTitle;
 
+    // ===== DATA =====
     private String fileUrl;
 
-    private Double score;     // nullable (chưa chấm)
-    private String feedback;  // nullable
+    private BigDecimal score;     // nullable (chưa chấm)
+    private String feedback;      // nullable
 
     private SubmissionStatus status;
 
+    // ===== TIME =====
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime submittedAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime gradedAt;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

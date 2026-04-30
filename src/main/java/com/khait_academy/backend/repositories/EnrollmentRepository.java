@@ -1,64 +1,25 @@
 package com.khait_academy.backend.repositories;
 
 import com.khait_academy.backend.entities.Enrollment;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.*;
+import com.khait_academy.backend.enums.EnrollmentStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
-    // ================= USER =================
+    // ================= FIND =================
 
-    // 👉 dùng cho list đơn giản (không cần course detail)
-    List<Enrollment> findByUser_Id(Long userId);
+    List<Enrollment> findByStudent_Id(Long studentId);
 
-    // 👉 chuẩn nhất (có course + user + sort)
-    @EntityGraph(attributePaths = {"course"})
-    List<Enrollment> findByUser_IdOrderByEnrolledAtDesc(Long userId);
-
-    // 👉 pagination + fetch course (QUAN TRỌNG)
-    @EntityGraph(attributePaths = {"course"})
-    Page<Enrollment> findByUser_Id(Long userId, Pageable pageable);
-
-
-    // ================= COURSE =================
-
-    @EntityGraph(attributePaths = {"user"})
     List<Enrollment> findByCourse_Id(Long courseId);
 
-    @EntityGraph(attributePaths = {"user"})
-    Page<Enrollment> findByCourse_Id(Long courseId, Pageable pageable);
+    List<Enrollment> findByStatus(EnrollmentStatus status);
 
+    // ================= SINGLE =================
 
-    // ================= CHECK =================
+    Optional<Enrollment> findByStudent_IdAndCourse_Id(Long studentId, Long courseId);
 
-    Optional<Enrollment> findByUser_IdAndCourse_Id(Long userId, Long courseId);
-
-    boolean existsByUser_IdAndCourse_Id(Long userId, Long courseId);
-
-
-    // ================= ADMIN =================
-
-    // 👉 danh sách full có relation
-    @EntityGraph(attributePaths = {"user", "course"})
-    List<Enrollment> findAllByOrderByEnrolledAtDesc();
-
-    // 👉 pagination admin
-    @EntityGraph(attributePaths = {"user", "course"})
-    Page<Enrollment> findAll(Pageable pageable);
-
-
-    // ================= CUSTOM QUERY (OPTIONAL - PRO) =================
-
-    // 👉 fetch join (tối ưu hơn entity graph trong vài trường hợp)
-    @Query("""
-        SELECT e FROM Enrollment e
-        JOIN FETCH e.course
-        WHERE e.user.id = :userId
-        ORDER BY e.enrolledAt DESC
-    """)
-    List<Enrollment> findMyCoursesFetch(Long userId);
+    boolean existsByStudent_IdAndCourse_Id(Long studentId, Long courseId);
 }

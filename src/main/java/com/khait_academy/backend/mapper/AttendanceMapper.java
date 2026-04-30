@@ -1,70 +1,66 @@
 package com.khait_academy.backend.mapper;
 
+import com.khait_academy.backend.dto.request.AttendanceRequest;
 import com.khait_academy.backend.dto.response.AttendanceResponse;
 import com.khait_academy.backend.entities.Attendance;
-import com.khait_academy.backend.enums.AttendanceStatus;
-
-import java.util.List;
+import com.khait_academy.backend.entities.Lesson;
+import com.khait_academy.backend.entities.Student;
 
 public class AttendanceMapper {
 
-    private AttendanceMapper() {
-        // prevent instantiation
-    }
+    // ================= CREATE =================
+    public static Attendance toEntity(
+            AttendanceRequest request,
+            Student student,
+            Lesson lesson
+    ) {
 
-    public static AttendanceResponse toResponse(Attendance entity) {
-
-        if (entity == null) {
-            return null;
-        }
-
-        return AttendanceResponse.builder()
-                .id(entity.getId())
-
-                // USER
-                .userId(getUserId(entity))
-                .userName(getUserName(entity))
-
-                // LESSON
-                .lessonId(getLessonId(entity))
-                .lessonTitle(getLessonTitle(entity))
-
-                // ✅ FIX QUAN TRỌNG: trả về ENUM, KHÔNG phải String
-                .status(getStatus(entity))
-
-                .attendedAt(entity.getAttendedAt())
-                .note(entity.getNote())
+        return Attendance.builder()
+                .student(student)
+                .lesson(lesson)
+                .status(request.getStatus())
+                .attendedAt(request.getAttendedAt())
+                .note(request.getNote())
+                .checkedBy(request.getCheckedBy())
                 .build();
     }
 
-    // ================= HELPER METHODS =================
+    // ================= RESPONSE =================
+    public static AttendanceResponse toResponse(Attendance a) {
 
-    private static Long getUserId(Attendance entity) {
-        return entity.getUser() != null ? entity.getUser().getId() : null;
+        return AttendanceResponse.builder()
+                .id(a.getId())
+
+                // student
+                .studentId(a.getStudent() != null ? a.getStudent().getId() : null)
+                .studentName(
+                        a.getStudent() != null && a.getStudent().getUser() != null
+                                ? a.getStudent().getUser().getFullName()
+                                : null
+                )
+
+                // lesson
+                .lessonId(a.getLesson() != null ? a.getLesson().getId() : null)
+                .lessonTitle(a.getLesson() != null ? a.getLesson().getTitle() : null)
+
+                // attendance
+                .status(a.getStatus())
+                .attendedAt(a.getAttendedAt())
+                .note(a.getNote())
+
+                .checkedBy(a.getCheckedBy())
+
+                .createdAt(a.getCreatedAt())
+                .updatedAt(a.getUpdatedAt())
+                .build();
     }
 
-    private static String getUserName(Attendance entity) {
-        return entity.getUser() != null ? entity.getUser().getFullName() : null;
-    }
+    // ================= UPDATE =================
+    public static void updateEntity(Attendance a, AttendanceRequest r) {
 
-    private static Long getLessonId(Attendance entity) {
-        return entity.getLesson() != null ? entity.getLesson().getId() : null;
-    }
-
-    private static String getLessonTitle(Attendance entity) {
-        return entity.getLesson() != null ? entity.getLesson().getTitle() : null;
-    }
-
-    // ✅ RETURN ENUM (chuẩn với DTO)
-    private static AttendanceStatus getStatus(Attendance entity) {
-        return entity.getStatus();
-    }
-
-    // ================= MAP LIST =================
-
-    public static List<AttendanceResponse> toList(List<Attendance> entities) {
-        return entities.stream()
-                .map(AttendanceMapper::toResponse)
-                .toList();
+        if (r.getStatus() != null) a.setStatus(r.getStatus());
+        if (r.getAttendedAt() != null) a.setAttendedAt(r.getAttendedAt());
+        if (r.getNote() != null) a.setNote(r.getNote());
+        if (r.getCheckedBy() != null) a.setCheckedBy(r.getCheckedBy());
     }
 }

@@ -1,21 +1,27 @@
 package com.khait_academy.backend.dto.response;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
 @Builder
 public class LessonProgressResponse {
 
+    private Long id;
+
+    private Long studentId;
+    private String studentName;
+
     private Long lessonId;
+    private String lessonTitle;
 
-    private Double progress; // %
+    private Boolean completed;
+    private Integer progress;
 
-    private boolean completed;
+    private Integer lastPosition;
 
-    private Long lastPosition; // seconds
-
-    private LocalDateTime updatedAt;
+    private LocalDateTime lastAccessedAt;
+    private LocalDateTime completedAt;
 }

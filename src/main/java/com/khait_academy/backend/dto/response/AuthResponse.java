@@ -9,12 +9,19 @@ import java.util.List;
 @Builder
 public class AuthResponse {
 
-    private String accessToken;        // ✅ dùng cái này thôi
-    private String tokenType;    // Bearer
+    // ===== TOKEN =====
+    private String accessToken;
+    private String refreshToken;
 
+    // cố định FE dùng "Bearer"
+    @Builder.Default
+    private String tokenType = "Bearer";
+
+    // ===== USER INFO =====
     private Long userId;
     private String email;
     private String fullName;
 
+    // ===== AUTH =====
     private List<String> roles;
 }

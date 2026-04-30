@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,14 +15,20 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import io.jsonwebtoken.ExpiredJwtException;
+
 import java.io.IOException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsServiceImpl userDetailsService;
+
+    private static final String HEADER_AUTH = "Authorization";
+    private static final String TOKEN_PREFIX = "Bearer ";
 
     @Override
     protected void doFilterInternal(
@@ -31,34 +38,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         try {
-            // 1. Lấy header Authorization
-            String authHeader = request.getHeader("Authorization");
+            String token = resolveToken(request);
 
-            // 2. Check header hợp lệ
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            // Nếu không có token → bỏ qua
+            if (token == null) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            // 3. Cắt token
-            String token = authHeader.substring(7);
+            // Nếu đã có authentication → bỏ qua
+            if (SecurityContextHolder.getContext().getAuthentication() != null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
 
-            // 4. Validate token
+            // Validate token
             if (!jwtTokenProvider.validateToken(token)) {
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            // 5. Lấy email từ token (theo method của bạn)
+            //  Check token type (chỉ cho ACCESS)
+            String type = jwtTokenProvider.getTokenType(token);
+            if (!"ACCESS".equals(type)) {
+                log.warn("Invalid token type: {}", type);
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // Lấy email
             String email = jwtTokenProvider.getEmailFromToken(token);
 
-            // 6. Nếu chưa có authentication
-            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-                // 7. Load user từ DB
+            if (email != null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-                // 8. Tạo authentication
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
@@ -70,16 +83,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         new WebAuthenticationDetailsSource().buildDetails(request)
                 );
 
-                // 🔥 QUAN TRỌNG NHẤT
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
 
+        } catch (ExpiredJwtException ex) {
+            log.warn("JWT expired: {}", ex.getMessage());
         } catch (Exception ex) {
-            // log lỗi
-            System.out.println("JWT Filter error: " + ex.getMessage());
+            log.error("JWT filter error: {}", ex.getMessage(), ex);
         }
 
-        // 9. tiếp tục filter chain
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Tách logic lấy token (clean code)
+     */
+    private String resolveToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader(HEADER_AUTH);
+
+        if (bearerToken != null && bearerToken.startsWith(TOKEN_PREFIX)) {
+            return bearerToken.substring(7);
+        }
+        return null;
     }
 }

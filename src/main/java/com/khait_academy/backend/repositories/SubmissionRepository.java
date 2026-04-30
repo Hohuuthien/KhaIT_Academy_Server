@@ -10,26 +10,37 @@ import java.util.Optional;
 
 public interface SubmissionRepository extends JpaRepository<Submission, Long> {
 
-    /**
-     * ✅ Tìm submission theo user + assignment (UPSERT)
-     */
-    @EntityGraph(attributePaths = {"user", "assignment"})
-    Optional<Submission> findByUser_IdAndAssignment_Id(Long userId, Long assignmentId);
+    // ================= UPSERT =================
+    @EntityGraph(attributePaths = {"student", "assignment"})
+    Optional<Submission> findByStudent_IdAndAssignment_Id(Long studentId, Long assignmentId);
 
-    /**
-     * ✅ Lấy danh sách theo assignment (có pagination)
-     */
-    @EntityGraph(attributePaths = {"user", "assignment"})
+    // ================= BY ASSIGNMENT =================
+    @EntityGraph(attributePaths = {"student", "assignment"})
+    @Query("""
+        SELECT s FROM Submission s
+        WHERE s.assignment.id = :assignmentId
+        ORDER BY s.submittedAt DESC
+    """)
     Page<Submission> findByAssignment_Id(Long assignmentId, Pageable pageable);
 
-    /**
-     * ✅ Lấy danh sách theo user (có pagination)
-     */
+    // ================= BY STUDENT =================
     @EntityGraph(attributePaths = {"assignment"})
-    Page<Submission> findByUser_Id(Long userId, Pageable pageable);
+    @Query("""
+        SELECT s FROM Submission s
+        WHERE s.student.id = :studentId
+        ORDER BY s.submittedAt DESC
+    """)
+    Page<Submission> findByStudent_Id(Long studentId, Pageable pageable);
 
-    /**
-     * ✅ (Optional) Check tồn tại
-     */
-    boolean existsByUser_IdAndAssignment_Id(Long userId, Long assignmentId);
+    // ================= SINGLE =================
+    @EntityGraph(attributePaths = {"student", "assignment"})
+    Optional<Submission> findById(Long id);
+
+    // ================= EXISTS =================
+    boolean existsByStudent_IdAndAssignment_Id(Long studentId, Long assignmentId);
+
+    // ================= COUNT (optional nhưng rất hữu ích) =================
+    long countByAssignment_Id(Long assignmentId);
+
+    long countByStudent_Id(Long studentId);
 }

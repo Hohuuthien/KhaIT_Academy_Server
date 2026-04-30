@@ -1,72 +1,126 @@
 package com.khait_academy.backend.controllers;
 
-import com.khait_academy.backend.dto.request.LoginRequest;
-import com.khait_academy.backend.dto.request.RegisterRequest;
+import com.khait_academy.backend.dto.request.*;
 import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.AuthResponse;
+import com.khait_academy.backend.security.UserPrincipal;
 import com.khait_academy.backend.services.AuthService;
 
 import lombok.RequiredArgsConstructor;
 
+import jakarta.validation.Valid;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
 
-    /**
-     *  REGISTER
-     */
+    // ================= REGISTER =================
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<String>> register(
+            @Valid @RequestBody RegisterRequest request) {
 
-        AuthResponse response = authService.register(request);
+        authService.register(request);
 
-        return ResponseEntity.ok(
-                ApiResponse.<AuthResponse>builder()
-                        .success(true)
-                        .message("Register successfully")
-                        .data(response)
-                        .build()
-        );
+        return response(HttpStatus.ACCEPTED,
+                "OTP sent to your email",
+                "Check your email to verify account");
     }
 
-    /**
-     *  LOGIN
-     */
+    // ================= VERIFY OTP =================
+    @PostMapping("/verify")
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        AuthResponse response = authService.verifyOtpAndCreateUser(
+                request.getEmail(),
+                request.getOtp(),
+                request.getPassword(),
+                request.getFullName()
+        );
+
+        return response(HttpStatus.OK,
+                "Account verified successfully",
+                response);
+    }
+
+    // ================= LOGIN =================
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
+            @Valid @RequestBody LoginRequest request) {
 
         AuthResponse response = authService.login(request);
 
-        return ResponseEntity.ok(
-                ApiResponse.<AuthResponse>builder()
-                        .success(true)
-                        .message("Login successfully")
-                        .data(response)
-                        .build()
-        );
+        return response(HttpStatus.OK,
+                "Login successfully",
+                response);
     }
 
-    /**
-     * GET CURRENT USER (từ JWT)
-     */
+    // ================= FORGOT PASSWORD =================
+    @PostMapping("/password/forgot")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        authService.forgotPassword(request.getEmail());
+
+        return response(HttpStatus.OK,
+                "OTP sent to email",
+                "Check your email to reset password");
+    }
+
+    // ================= RESET PASSWORD =================
+    @PostMapping("/password/reset")
+    public ResponseEntity<ApiResponse<String>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        authService.resetPassword(
+                request.getEmail(),
+                request.getOtp(),
+                request.getNewPassword()
+        );
+
+        return response(HttpStatus.OK,
+                "Password reset successfully",
+                "You can now login with new password");
+    }
+
+    // ================= CURRENT USER =================
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<String>> me(Authentication authentication) {
+    public ResponseEntity<ApiResponse<AuthResponse>> me(Authentication authentication) {
 
-        // lấy email từ token (đã set trong SecurityContext)
-        String email = authentication.getName();
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
-        return ResponseEntity.ok(
-                ApiResponse.<String>builder()
+        AuthResponse response = AuthResponse.builder()
+                .userId(principal.getId())
+                .email(principal.getEmail())
+                .fullName(principal.getFullName())
+                .roles(
+                        principal.getAuthorities()
+                                .stream()
+                                .map(a -> a.getAuthority())
+                                .toList()
+                )
+                .build();
+
+        return response(HttpStatus.OK,
+                "Get current user success",
+                response);
+    }
+
+    // ================= COMMON RESPONSE =================
+    private <T> ResponseEntity<ApiResponse<T>> response(HttpStatus status, String message, T data) {
+        return ResponseEntity.status(status).body(
+                ApiResponse.<T>builder()
                         .success(true)
-                        .message("Get current user success")
-                        .data(email)
+                        .message(message)
+                        .data(data)
                         .build()
         );
     }
