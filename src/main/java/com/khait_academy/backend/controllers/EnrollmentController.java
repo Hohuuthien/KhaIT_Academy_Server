@@ -8,96 +8,142 @@ import com.khait_academy.backend.services.EnrollmentService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/enrollments")
+@RequestMapping("/api/enrollments")
 @RequiredArgsConstructor
-@Slf4j
 public class EnrollmentController {
 
     private final EnrollmentService enrollmentService;
 
-    // ===== ENROLL =====
+    // ================= CREATE =================
     @PostMapping
-    public ResponseEntity<ApiResponse<EnrollmentResponse>> enroll(
-            @RequestBody @Valid EnrollmentRequest request,
-            Authentication authentication
-    ) {
+    public ResponseEntity<ApiResponse<EnrollmentResponse>> create(
+            @Valid @RequestBody EnrollmentRequest request) {
 
-        String email = extractEmail(authentication);
+        EnrollmentResponse response = enrollmentService.create(request);
 
-        EnrollmentResponse res = enrollmentService.enrollByEmail(email, request.getCourseId());
+        return ResponseEntity
+                .created(URI.create("/api/v1/enrollments/" + response.getId()))
+                .body(
+                        ApiResponse.<EnrollmentResponse>builder()
+                                .success(true)
+                                .message("Enroll course successfully")
+                                .data(response)
+                                .build()
+                );
+    }
 
-        log.info("User {} enrolled course {}", email, request.getCourseId());
+    // ================= GET ALL =================
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getAll() {
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-                ApiResponse.<EnrollmentResponse>builder()
-                        .success(true)
-                        .message("Đăng ký khóa học thành công")
-                        .data(res)
-                        .build()
+        List<EnrollmentResponse> responses = enrollmentService.getAll();
+
+        return ok(
+                responses.isEmpty()
+                        ? "No enrollments found"
+                        : "Get enrollments successfully",
+                responses
         );
     }
 
-    // ===== MY COURSES =====
-    @GetMapping("/me")
-    public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> myCourses(
-            Authentication authentication
-    ) {
+    // ================= GET BY ID =================
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<EnrollmentResponse>> getById(
+            @PathVariable Long id) {
 
-        String email = extractEmail(authentication);
+        if (id == null || id <= 0) {
+            throw new BadRequestException("Invalid enrollment id");
+        }
 
-        List<EnrollmentResponse> data = enrollmentService.getMyCoursesByEmail(email);
+        EnrollmentResponse response = enrollmentService.getById(id);
 
+        return ok("Get enrollment successfully", response);
+    }
+
+    // ================= UPDATE =================
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<EnrollmentResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody EnrollmentRequest request) {
+
+        if (id == null || id <= 0) {
+            throw new BadRequestException("Invalid enrollment id");
+        }
+
+        EnrollmentResponse response = enrollmentService.update(id, request);
+
+        return ok("Update enrollment successfully", response);
+    }
+
+    // ================= DELETE =================
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable Long id) {
+
+        if (id == null || id <= 0) {
+            throw new BadRequestException("Invalid enrollment id");
+        }
+
+        enrollmentService.delete(id);
+
+        return ok("Delete enrollment successfully", null);
+    }
+
+    // ================= BY STUDENT =================
+    @GetMapping("/student/{studentId}")
+    public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getByStudent(
+            @PathVariable Long studentId) {
+
+        if (studentId == null || studentId <= 0) {
+            throw new BadRequestException("Invalid student id");
+        }
+
+        List<EnrollmentResponse> responses = enrollmentService.getByStudent(studentId);
+
+        return ok(
+                responses.isEmpty()
+                        ? "No enrollments found for this student"
+                        : "Get enrollments by student successfully",
+                responses
+        );
+    }
+
+    // ================= BY COURSE =================
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getByCourse(
+            @PathVariable Long courseId) {
+
+        if (courseId == null || courseId <= 0) {
+            throw new BadRequestException("Invalid course id");
+        }
+
+        List<EnrollmentResponse> responses = enrollmentService.getByCourse(courseId);
+
+        return ok(
+                responses.isEmpty()
+                        ? "No enrollments found for this course"
+                        : "Get enrollments by course successfully",
+                responses
+        );
+    }
+
+    // ================= COMMON RESPONSE =================
+    private <T> ResponseEntity<ApiResponse<T>> ok(String message, T data) {
         return ResponseEntity.ok(
-                ApiResponse.<List<EnrollmentResponse>>builder()
+                ApiResponse.<T>builder()
                         .success(true)
-                        .message("Lấy danh sách khóa học thành công")
+                        .message(message)
                         .data(data)
                         .build()
         );
-    }
-
-    // ===== CHECK ENROLLED =====
-    @GetMapping("/check")
-    public ResponseEntity<ApiResponse<Boolean>> checkEnrolled(
-            @RequestParam Long courseId,
-            Authentication authentication
-    ) {
-
-        if (courseId == null) {
-            throw new BadRequestException("courseId không được null");
-        }
-
-        String email = extractEmail(authentication);
-
-        boolean enrolled = enrollmentService.isEnrolledByEmail(email, courseId);
-
-        return ResponseEntity.ok(
-                ApiResponse.<Boolean>builder()
-                        .success(true)
-                        .message("Kiểm tra trạng thái đăng ký thành công")
-                        .data(enrolled)
-                        .build()
-        );
-    }
-
-    // ===== HELPER =====
-    private String extractEmail(Authentication authentication) {
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            log.error("Unauthorized access attempt");
-            throw new BadRequestException("Bạn chưa đăng nhập");
-        }
-
-        return authentication.getName(); // email từ JWT
     }
 }

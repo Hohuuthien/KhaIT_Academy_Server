@@ -1,21 +1,20 @@
 package com.khait_academy.backend.dto.request;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 
 @Data
 public class LessonProgressRequest {
 
-    @NotNull(message = "lessonId is required")
+    @NotNull
+    private Long studentId;
+
+    @NotNull
     private Long lessonId;
 
-    @NotNull(message = "progress is required")
-    @Min(value = 0, message = "progress must be >= 0")
-    @Max(value = 100, message = "progress must be <= 100")
-    private Double progress; // %
+    @Min(0)
+    @Max(100)
+    private Integer progress;
 
-    // vị trí video (giây)
-    private Long lastPosition;
+    private Integer lastPosition;
 }

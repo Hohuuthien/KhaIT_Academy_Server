@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import static com.khait_academy.backend.constants.SecurityEndpoints.*;
 
 @Configuration
 @EnableWebSecurity
@@ -34,53 +35,57 @@ public class SecurityConfig {
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtAuthenticationFilter jwtAuthFilter;
 
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-            //  disable CSRF (API dùng JWT)
             .csrf(csrf -> csrf.disable())
 
-            //  dùng CorsConfig bean
-            .cors(cors -> {})
-
-            //  không dùng session
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
 
-            //  phân quyền API
             .authorizeHttpRequests(auth -> auth
 
                 // PUBLIC
-                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers(PUBLIC).permitAll()
+                .requestMatchers(HttpMethod.GET, PUBLIC_GET).permitAll()
 
-                .requestMatchers(HttpMethod.GET, "/api/v1/courses/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
-                .requestMatchers("/api/v1/enrollments/**").authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/v1/lessons/**").permitAll()
-                .requestMatchers("/api/v1/lessons/**").hasRole("ADMIN")
-                // ADMIN ONLY
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                // AUTHENTICATED
+                .requestMatchers(ENROLLMENT).authenticated()
 
-                // tất cả còn lại cần login
+                // COURSE
+                .requestMatchers(HttpMethod.POST, COURSE)
+                    .hasAnyRole("TEACHER", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, COURSE)
+                    .hasAnyRole("TEACHER", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, COURSE)
+                    .hasRole("ADMIN")
+
+                // LESSON
+                .requestMatchers(HttpMethod.POST, LESSON)
+                    .hasAnyRole("TEACHER", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, LESSON)
+                    .hasAnyRole("TEACHER", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, LESSON)
+                    .hasRole("ADMIN")
+
+                // ADMIN
+                .requestMatchers(ADMIN).hasRole("ADMIN")
+
                 .anyRequest().authenticated()
             )
 
-            //  provider xác thực
             .authenticationProvider(authenticationProvider())
-
-            //  JWT filter
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    /**
-     *  Authentication Provider (Spring Security 6+)
-     */
+    // ===== AUTH PROVIDER =====
     @Bean
-    public DaoAuthenticationProvider authenticationProvider() {
+    public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
 
         provider.setUserDetailsService(userDetailsService);
@@ -88,17 +93,14 @@ public class SecurityConfig {
 
         return provider;
     }
-    /**
-     *  Password Encoder
-     */
+
+    // ===== PASSWORD ENCODER =====
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // mặc định strength = 10
+        return new BCryptPasswordEncoder(12); // tăng strength
     }
 
-    /**
-     *  Authentication Manager
-     */
+    // ===== AUTH MANAGER =====
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
             throws Exception {

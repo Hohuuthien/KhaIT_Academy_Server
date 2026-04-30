@@ -1,22 +1,37 @@
 package com.khait_academy.backend.repositories;
 
-import java.util.List;
-import java.util.Optional;
-
+import com.khait_academy.backend.entities.User;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import com.khait_academy.backend.entities.User;
+import java.util.List;
+import java.util.Optional;
 
-public interface UserRepository extends JpaRepository<User,Long>{
-    @EntityGraph(attributePaths = "roles")
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    @EntityGraph(attributePaths = {"roles", "roles.permissions"})
     List<User> findAll();
 
-    @EntityGraph(attributePaths = "roles")
+    // =========================
+    // AUTH LOOKUP (FULL RBAC)
+    // =========================
+    @EntityGraph(attributePaths = {
+            "roles",
+            "roles.permissions"
+    })
     Optional<User> findByEmail(String email);
+
+    // =========================
+    // EXISTS CHECK
+    // =========================
     boolean existsByEmail(String email);
 
-    @EntityGraph(attributePaths = "roles")
-    Optional<User> findById(Long id);
-
+    // =========================
+    // LOAD USER BY ID (PROFILE)
+    // =========================
+    @EntityGraph(attributePaths = {
+            "roles",
+            "roles.permissions"
+    })
+    Optional<User> findUserWithRolesAndPermissionsById(Long id);
 }

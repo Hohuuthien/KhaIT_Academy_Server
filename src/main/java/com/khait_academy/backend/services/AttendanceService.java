@@ -4,19 +4,19 @@ import com.khait_academy.backend.dto.request.AttendanceRequest;
 import com.khait_academy.backend.dto.response.AttendanceResponse;
 import com.khait_academy.backend.entities.Attendance;
 import com.khait_academy.backend.entities.Lesson;
-import com.khait_academy.backend.entities.User;
+import com.khait_academy.backend.entities.Student;
+import com.khait_academy.backend.exception.BadRequestException;
+import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.AttendanceMapper;
 import com.khait_academy.backend.repositories.AttendanceRepository;
 import com.khait_academy.backend.repositories.LessonRepository;
-import com.khait_academy.backend.repositories.UserRepository;
+import com.khait_academy.backend.repositories.StudentRepository;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Service
@@ -25,84 +25,90 @@ import java.util.List;
 public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
-    private final UserRepository userRepository;
+    private final StudentRepository studentRepository;
     private final LessonRepository lessonRepository;
 
-    /**
-     * CHECK-IN / UPDATE (UPSERT)
-     */
-    public AttendanceResponse checkIn(AttendanceRequest request) {
+    // ================= CREATE =================
+    public AttendanceResponse create(AttendanceRequest request) {
 
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with id = " + request.getUserId()));
-
-        Lesson lesson = lessonRepository.findById(request.getLessonId())
-                .orElseThrow(() -> new RuntimeException("Lesson not found with id = " + request.getLessonId()));
-
-        Attendance attendance = attendanceRepository
-                .findByUser_IdAndLesson_Id(user.getId(), lesson.getId())
-                .orElseGet(() -> Attendance.builder()
-                        .user(user)
-                        .lesson(lesson)
-                        .build()
-                );
-
-        attendance.setStatus(request.getStatus());
-        attendance.setNote(request.getNote());
-        attendance.setAttendedAt(LocalDateTime.now());
-
-        Attendance saved = attendanceRepository.save(attendance);
-
-        return AttendanceMapper.toResponse(saved);
-    }
-
-    /**
-     * GET BY LESSON (LIST)
-     */
-    @Transactional(Transactional.TxType.SUPPORTS)
-    public List<AttendanceResponse> getByLesson(Long lessonId) {
-        return AttendanceMapper.toList(
-                attendanceRepository.findByLesson_Id(lessonId)
-        );
-    }
-
-    /**
-     * GET BY USER (LIST)
-     */
-    @Transactional(Transactional.TxType.SUPPORTS)
-    public List<AttendanceResponse> getByUser(Long userId) {
-        return AttendanceMapper.toList(
-                attendanceRepository.findByUser_Id(userId)
-        );
-    }
-
-    /**
-     * GET BY LESSON (PAGINATION) 🔥
-     */
-    @Transactional(Transactional.TxType.SUPPORTS)
-    public Page<AttendanceResponse> getByLesson(Long lessonId, Pageable pageable) {
-        return attendanceRepository.findByLesson_Id(lessonId, pageable)
-                .map(AttendanceMapper::toResponse);
-    }
-
-    /**
-     * GET BY USER (PAGINATION) 🔥
-     */
-    @Transactional(Transactional.TxType.SUPPORTS)
-    public Page<AttendanceResponse> getByUser(Long userId, Pageable pageable) {
-        return attendanceRepository.findByUser_Id(userId, pageable)
-                .map(AttendanceMapper::toResponse);
-    }
-
-    /**
-     * DELETE
-     */
-    public void delete(Long id) {
-
-        if (!attendanceRepository.existsById(id)) {
-            throw new RuntimeException("Attendance not found with id = " + id);
+        if (attendanceRepository.findByStudentIdAndLessonId(
+                request.getStudentId(),
+                request.getLessonId()
+        ).isPresent()) {
+            throw new BadRequestException("Attendance already exists for this student & lesson");
         }
 
-        attendanceRepository.deleteById(id);
+        Student student = studentRepository.findById(request.getStudentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+
+        Lesson lesson = lessonRepository.findById(request.getLessonId())
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
+
+        Attendance attendance = AttendanceMapper.toEntity(request, student, lesson);
+
+        return AttendanceMapper.toResponse(
+                attendanceRepository.save(attendance)
+        );
+    }
+
+    // ================= GET ALL =================
+    @Transactional(readOnly = true)
+    public List<AttendanceResponse> getAll() {
+        return attendanceRepository.findAll()
+                .stream()
+                .map(AttendanceMapper::toResponse)
+                .toList();
+    }
+
+    // ================= GET BY ID =================
+    @Transactional(readOnly = true)
+    public AttendanceResponse getById(Long id) {
+
+        Attendance attendance = attendanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance not found"));
+
+        return AttendanceMapper.toResponse(attendance);
+    }
+
+    // ================= UPDATE =================
+    public AttendanceResponse update(Long id, AttendanceRequest request) {
+
+        Attendance attendance = attendanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance not found"));
+
+        AttendanceMapper.updateEntity(attendance, request);
+
+        return AttendanceMapper.toResponse(
+                attendanceRepository.save(attendance)
+        );
+    }
+
+    // ================= DELETE =================
+    public void delete(Long id) {
+
+        Attendance attendance = attendanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance not found"));
+
+        attendanceRepository.delete(attendance);
+    }
+
+    // ================= BY STUDENT =================
+    @Transactional(readOnly = true)
+    public List<AttendanceResponse> getByStudent(Long studentId) {
+
+        return attendanceRepository.findByStudentId(studentId)
+                .stream()
+                .map(AttendanceMapper::toResponse)
+                .toList();
+    }
+
+    // ================= BY LESSON =================
+    @Transactional(readOnly = true)
+    public List<AttendanceResponse> getByLesson(Long lessonId) {
+
+        return attendanceRepository.findByLessonId(lessonId)
+                .stream()
+                .map(AttendanceMapper::toResponse)
+                .toList();
     }
 }
