@@ -16,7 +16,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/students")
+@RequestMapping("/api/students")
 @RequiredArgsConstructor
 public class StudentController {
 
@@ -30,7 +30,7 @@ public class StudentController {
         StudentResponse response = studentService.create(request);
 
         return ResponseEntity
-                .created(URI.create("/api/v1/students/" + response.getId()))
+                .created(URI.create("/api/students/" + response.getId()))
                 .body(
                         ApiResponse.<StudentResponse>builder()
                                 .success(true)
