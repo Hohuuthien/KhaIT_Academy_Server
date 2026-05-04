@@ -1,90 +1,107 @@
-// package com.khait_academy.backend.controllers;
+package com.khait_academy.backend.controllers;
 
-// import com.khait_academy.backend.dto.request.LessonProgressRequest;
-// import com.khait_academy.backend.dto.response.ApiResponse;
-// import com.khait_academy.backend.dto.response.LessonProgressResponse;
-// import com.khait_academy.backend.services.LessonProgressService;
+import com.khait_academy.backend.dto.request.LessonProgressRequest;
+import com.khait_academy.backend.dto.response.ApiResponse;
+import com.khait_academy.backend.dto.response.LessonProgressResponse;
+import com.khait_academy.backend.security.UserPrincipal;
+import com.khait_academy.backend.services.LessonProgressService;
 
-// import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
-// import org.springframework.http.ResponseEntity;
-// import org.springframework.security.core.Authentication;
-// import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
-// import java.util.List;
+import java.util.List;
 
-// @RestController
-// @RequestMapping("/api/v1/progress")
-// @RequiredArgsConstructor
-// public class LessonProgressController {
+@RestController
+@RequestMapping("/api/lesson-progress")
+@RequiredArgsConstructor
+public class LessonProgressController {
 
-//     private final LessonProgressService lessonProgressService;
+    private final LessonProgressService lessonProgressService;
 
-//     // ================= UPDATE PROGRESS =================
-//     @PostMapping
-//     public ResponseEntity<ApiResponse<LessonProgressResponse>> updateProgress(
-//             @RequestBody LessonProgressRequest request,
-//             Authentication authentication
-//     ) {
-//         String email = extractEmail(authentication);
+    /**
+     * STUDENT
+     * CREATE / UPDATE MY PROGRESS
+     */
+    @PostMapping
+    public ResponseEntity<ApiResponse<LessonProgressResponse>> saveOrUpdate(
+            @AuthenticationPrincipal UserPrincipal user,
+            @Valid @RequestBody LessonProgressRequest request
+    ) {
 
-//         LessonProgressResponse response =
-//                 lessonProgressService.updateProgress(email, request);
+        LessonProgressResponse response =
+                lessonProgressService.saveOrUpdate(
+                        user.getId(),
+                        request
+                );
 
-//         return ResponseEntity.ok(
-//                 ApiResponse.<LessonProgressResponse>builder()
-//                         .success(true)
-//                         .message("Cập nhật tiến độ thành công")
-//                         .data(response)
-//                         .build()
-//         );
-//     }
+        return ResponseEntity.ok(
+                ApiResponse.<LessonProgressResponse>builder()
+                        .success(true)
+                        .message("Save your learning progress")
+                        .data(response)
+                        .build()
+        );
+    }
 
-//     // ================= GET BY COURSE =================
-//     @GetMapping("/course/{courseId}")
-//     public ResponseEntity<ApiResponse<List<LessonProgressResponse>>> getByCourse(
-//             @PathVariable Long courseId,
-//             Authentication authentication
-//     ) {
-//         String email = extractEmail(authentication);
+    /**
+     * STUDENT
+     * GET MY PROGRESS
+     */
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<List<LessonProgressResponse>>> getMyProgress(
+            @AuthenticationPrincipal UserPrincipal user
+    ) {
 
-//         List<LessonProgressResponse> response =
-//                 lessonProgressService.getProgressByCourse(email, courseId);
+        List<LessonProgressResponse> progressList =
+                lessonProgressService.getMyProgress(user.getId());
 
-//         return ResponseEntity.ok(
-//                 ApiResponse.<List<LessonProgressResponse>>builder()
-//                         .success(true)
-//                         .message("Danh sách tiến độ theo course")
-//                         .data(response)
-//                         .build()
-//         );
-//     }
+        return ResponseEntity.ok(
+                ApiResponse.<List<LessonProgressResponse>>builder()
+                        .success(true)
+                        .message("Learning progress list")
+                        .data(progressList)
+                        .build()
+        );
+    }
 
-//     // ================= GET BY LESSON =================
-//     @GetMapping("/lesson/{lessonId}")
-//     public ResponseEntity<ApiResponse<LessonProgressResponse>> getByLesson(
-//             @PathVariable Long lessonId,
-//             Authentication authentication
-//     ) {
-//         String email = extractEmail(authentication);
+    /**
+     * ADMIN / TEACHER
+     * GET PROGRESS BY LESSON
+     */
+    @GetMapping("/lesson/{lessonId}")
+    public ResponseEntity<ApiResponse<List<LessonProgressResponse>>> getByLesson(
+            @PathVariable Long lessonId
+    ) {
 
-//         LessonProgressResponse response =
-//                 lessonProgressService.getProgressByLesson(email, lessonId);
+        return ResponseEntity.ok(
+                ApiResponse.<List<LessonProgressResponse>>builder()
+                        .success(true)
+                        .message("Lesson progress list")
+                        .data(lessonProgressService.getByLesson(lessonId))
+                        .build()
+        );
+    }
 
-//         return ResponseEntity.ok(
-//                 ApiResponse.<LessonProgressResponse>builder()
-//                         .success(true)
-//                         .message("Tiến độ lesson")
-//                         .data(response)
-//                         .build()
-//         );
-//     }
+    /**
+     * ADMIN ONLY
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<String>> delete(
+            @PathVariable Long id
+    ) {
 
-//     // ================= SAFE AUTH EXTRACT =================
-//     private String extractEmail(Authentication authentication) {
-//         if (authentication == null || authentication.getName() == null) {
-//             throw new RuntimeException("Unauthorized: missing authentication");
-//         }
-//         return authentication.getName();
-//     }
-// }
+        lessonProgressService.delete(id);
+
+        return ResponseEntity.ok(
+                ApiResponse.<String>builder()
+                        .success(true)
+                        .message("Delete successful progress")
+                        .data("OK")
+                        .build()
+        );
+    }
+}

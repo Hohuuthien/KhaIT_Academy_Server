@@ -28,7 +28,7 @@ public class LessonController {
         return ResponseEntity.ok(
                 ApiResponse.<LessonResponse>builder()
                         .success(true)
-                        .message("Tạo lesson thành công")
+                        .message("Create lesson successfully")
                         .data(lessonService.create(request))
                         .build()
         );
@@ -44,7 +44,7 @@ public class LessonController {
         return ResponseEntity.ok(
                 ApiResponse.<List<LessonResponse>>builder()
                         .success(true)
-                        .message("Danh sách lesson")
+                        .message("List lessons")
                         .data(lessonService.getByCourse(courseId))
                         .build()
         );
