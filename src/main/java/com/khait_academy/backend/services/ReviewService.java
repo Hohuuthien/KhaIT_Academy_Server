@@ -3,15 +3,14 @@ package com.khait_academy.backend.services;
 import com.khait_academy.backend.dto.request.ReviewRequest;
 import com.khait_academy.backend.dto.response.ReviewResponse;
 import com.khait_academy.backend.entities.*;
-import com.khait_academy.backend.enums.EnrollmentStatus;
 import com.khait_academy.backend.enums.CourseStatus;
+import com.khait_academy.backend.enums.EnrollmentStatus;
 import com.khait_academy.backend.exception.BadRequestException;
 import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.ReviewMapper;
 import com.khait_academy.backend.repositories.*;
 
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,39 +27,17 @@ public class ReviewService {
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
 
-    // ================= CREATE REVIEW =================
+    // ================= CREATE =================
+
     public ReviewResponse create(ReviewRequest request, Long studentId) {
 
-        // check duplicate
-        if (reviewRepository.existsByStudent_IdAndCourse_Id(studentId, request.getCourseId())) {
-            throw new BadRequestException("Bạn đã đánh giá khóa học này rồi");
-        }
+        validateDuplicateReview(studentId, request.getCourseId());
 
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Student", "id", studentId)
-                );
+        Student student = findStudent(studentId);
+        Course course = findCourse(request.getCourseId());
 
-        Course course = courseRepository.findById(request.getCourseId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Course", "id", request.getCourseId())
-                );
-
-        if (course.getStatus() != CourseStatus.PUBLISHED) {
-            throw new BadRequestException("Khóa học chưa được publish");
-        }
-
-        boolean isEnrolled = enrollmentRepository
-                .findByStudent_IdAndCourse_Id(studentId, request.getCourseId())
-                .map(e ->
-                        e.getStatus() == EnrollmentStatus.ACTIVE ||
-                        e.getStatus() == EnrollmentStatus.COMPLETED
-                )
-                .orElse(false);
-
-        if (!isEnrolled) {
-            throw new BadRequestException("Bạn phải đăng ký khóa học trước");
-        }
+        validateCourseIsPublished(course);
+        validateStudentEnrollment(studentId, course.getId());
 
         Review review = Review.builder()
                 .student(student)
@@ -75,7 +52,8 @@ public class ReviewService {
         return ReviewMapper.toResponse(saved, studentId);
     }
 
-    // ================= GET BY COURSE =================
+    // ================= GET =================
+
     @Transactional(readOnly = true)
     public List<ReviewResponse> getByCourse(Long courseId, Long currentStudentId) {
 
@@ -83,20 +61,17 @@ public class ReviewService {
             throw new ResourceNotFoundException("Course", "id", courseId);
         }
 
-        return reviewRepository
-                .findByCourse_IdAndIsApprovedTrue(courseId)
+        return reviewRepository.findByCourse_IdAndIsApprovedTrue(courseId)
                 .stream()
                 .map(r -> ReviewMapper.toResponse(r, currentStudentId))
                 .toList();
     }
 
-    // ================= APPROVE REVIEW =================
+    // ================= APPROVE =================
+
     public void approve(Long reviewId) {
 
-        Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Review", "id", reviewId)
-                );
+        Review review = findReview(reviewId);
 
         if (Boolean.TRUE.equals(review.getIsApproved())) {
             return;
@@ -105,10 +80,11 @@ public class ReviewService {
         review.setIsApproved(true);
         reviewRepository.save(review);
 
-        updateCourseRating(review.getCourse().getId());
+        recalculateCourseRating(review.getCourse().getId());
     }
 
-    // ================= DELETE REVIEW =================
+    // ================= DELETE =================
+
     public void delete(Long reviewId, Long studentId) {
 
         Review review = reviewRepository.findByIdAndStudent_Id(reviewId, studentId)
@@ -120,19 +96,42 @@ public class ReviewService {
 
         reviewRepository.delete(review);
 
-        updateCourseRating(courseId);
+        recalculateCourseRating(courseId);
     }
 
-    // ================= UPDATE RATING =================
-    private void updateCourseRating(Long courseId) {
+    // ================= PRIVATE =================
+
+    private void validateDuplicateReview(Long studentId, Long courseId) {
+        if (reviewRepository.existsByStudent_IdAndCourse_Id(studentId, courseId)) {
+            throw new BadRequestException("Bạn đã đánh giá khóa học này rồi");
+        }
+    }
+
+    private void validateCourseIsPublished(Course course) {
+        if (course.getStatus() != CourseStatus.PUBLISHED) {
+            throw new BadRequestException("Khóa học chưa được publish");
+        }
+    }
+
+    private void validateStudentEnrollment(Long studentId, Long courseId) {
+
+        boolean enrolled = enrollmentRepository
+                .findByStudent_IdAndCourse_Id(studentId, courseId)
+                .map(e -> e.getStatus() == EnrollmentStatus.ACTIVE
+                        || e.getStatus() == EnrollmentStatus.COMPLETED)
+                .orElse(false);
+
+        if (!enrolled) {
+            throw new BadRequestException("Bạn phải đăng ký khóa học trước");
+        }
+    }
+
+    private void recalculateCourseRating(Long courseId) {
 
         Double avg = reviewRepository.getAverageRating(courseId);
         Long total = reviewRepository.countApproved(courseId);
 
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Course", "id", courseId)
-                );
+        Course course = findCourse(courseId);
 
         course.setAverageRating(
                 avg != null ? BigDecimal.valueOf(avg) : BigDecimal.ZERO
@@ -143,5 +142,26 @@ public class ReviewService {
         );
 
         courseRepository.save(course);
+    }
+
+    private Student findStudent(Long id) {
+        return studentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Student", "id", id)
+                );
+    }
+
+    private Course findCourse(Long id) {
+        return courseRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Course", "id", id)
+                );
+    }
+
+    private Review findReview(Long id) {
+        return reviewRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Review", "id", id)
+                );
     }
 }

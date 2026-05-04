@@ -11,30 +11,29 @@ public class EnrollmentMapper {
 
     // ================= CREATE =================
     public static Enrollment toEntity(
-            EnrollmentRequest request,
-            Student student,
-            Course course
-    ) {
+        EnrollmentRequest request,
+        Student student,
+        Course course
+) {
 
-        EnrollmentStatus status;
+    EnrollmentStatus status;
 
-        try {
-            status = request.getStatus() != null
-                    ? EnrollmentStatus.valueOf(request.getStatus().toUpperCase())
-                    : EnrollmentStatus.ACTIVE;
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid enrollment status");
-        }
-
-        return Enrollment.builder()
-                .student(student)
-                .course(course)
-                .priceAtPurchase(request.getPriceAtPurchase())
-                .progress(request.getProgress() != null ? request.getProgress() : 0)
-                .status(status)
-                .expiredAt(request.getExpiredAt())
-                .build();
+    try {
+        status = request.getStatus() != null
+                ? EnrollmentStatus.valueOf(request.getStatus().toUpperCase())
+                : EnrollmentStatus.ACTIVE;
+    } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid enrollment status");
     }
+
+    return Enrollment.builder()
+            .student(student)
+            .course(course)
+            .progress(request.getProgress() != null ? request.getProgress() : 0)
+            .status(status)
+            .expiredAt(request.getExpiredAt())
+            .build();
+}
 
     // ================= RESPONSE =================
     public static EnrollmentResponse toResponse(Enrollment e) {

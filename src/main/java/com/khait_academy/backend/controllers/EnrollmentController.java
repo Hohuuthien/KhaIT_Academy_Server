@@ -5,7 +5,7 @@ import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.EnrollmentResponse;
 import com.khait_academy.backend.exception.BadRequestException;
 import com.khait_academy.backend.services.EnrollmentService;
-
+import jakarta.validation.constraints.Min;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -31,119 +31,77 @@ public class EnrollmentController {
         EnrollmentResponse response = enrollmentService.create(request);
 
         return ResponseEntity
-                .created(URI.create("/api/v1/enrollments/" + response.getId()))
-                .body(
-                        ApiResponse.<EnrollmentResponse>builder()
-                                .success(true)
-                                .message("Enroll course successfully")
-                                .data(response)
-                                .build()
-                );
+                .created(URI.create("/api/enrollments/" + response.getId()))
+                .body(success("Enroll course successfully", response));
     }
 
     // ================= GET ALL =================
     @GetMapping
     public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getAll() {
-
-        List<EnrollmentResponse> responses = enrollmentService.getAll();
-
-        return ok(
-                responses.isEmpty()
-                        ? "No enrollments found"
-                        : "Get enrollments successfully",
-                responses
+        return ResponseEntity.ok(
+                success("Get enrollments successfully", enrollmentService.getAll())
         );
     }
 
     // ================= GET BY ID =================
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<EnrollmentResponse>> getById(
-            @PathVariable Long id) {
+            @PathVariable @Min(1) Long id) {
 
-        if (id == null || id <= 0) {
-            throw new BadRequestException("Invalid enrollment id");
-        }
-
-        EnrollmentResponse response = enrollmentService.getById(id);
-
-        return ok("Get enrollment successfully", response);
+        return ResponseEntity.ok(
+                success("Get enrollment successfully", enrollmentService.getById(id))
+        );
     }
 
     // ================= UPDATE =================
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<EnrollmentResponse>> update(
-            @PathVariable Long id,
+            @PathVariable @Min(1) Long id,
             @Valid @RequestBody EnrollmentRequest request) {
 
-        if (id == null || id <= 0) {
-            throw new BadRequestException("Invalid enrollment id");
-        }
-
-        EnrollmentResponse response = enrollmentService.update(id, request);
-
-        return ok("Update enrollment successfully", response);
+        return ResponseEntity.ok(
+                success("Update enrollment successfully",
+                        enrollmentService.update(id, request))
+        );
     }
 
     // ================= DELETE =================
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> delete(
-            @PathVariable Long id) {
-
-        if (id == null || id <= 0) {
-            throw new BadRequestException("Invalid enrollment id");
-        }
+    public ResponseEntity<Void> delete(
+            @PathVariable @Min(1) Long id) {
 
         enrollmentService.delete(id);
-
-        return ok("Delete enrollment successfully", null);
+        return ResponseEntity.noContent().build(); // ✅ chuẩn REST
     }
 
     // ================= BY STUDENT =================
     @GetMapping("/student/{studentId}")
     public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getByStudent(
-            @PathVariable Long studentId) {
+            @PathVariable @Min(1) Long studentId) {
 
-        if (studentId == null || studentId <= 0) {
-            throw new BadRequestException("Invalid student id");
-        }
-
-        List<EnrollmentResponse> responses = enrollmentService.getByStudent(studentId);
-
-        return ok(
-                responses.isEmpty()
-                        ? "No enrollments found for this student"
-                        : "Get enrollments by student successfully",
-                responses
+        return ResponseEntity.ok(
+                success("Get enrollments by student successfully",
+                        enrollmentService.getByStudent(studentId))
         );
     }
 
     // ================= BY COURSE =================
     @GetMapping("/course/{courseId}")
     public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getByCourse(
-            @PathVariable Long courseId) {
+            @PathVariable @Min(1) Long courseId) {
 
-        if (courseId == null || courseId <= 0) {
-            throw new BadRequestException("Invalid course id");
-        }
-
-        List<EnrollmentResponse> responses = enrollmentService.getByCourse(courseId);
-
-        return ok(
-                responses.isEmpty()
-                        ? "No enrollments found for this course"
-                        : "Get enrollments by course successfully",
-                responses
+        return ResponseEntity.ok(
+                success("Get enrollments by course successfully",
+                        enrollmentService.getByCourse(courseId))
         );
     }
 
     // ================= COMMON RESPONSE =================
-    private <T> ResponseEntity<ApiResponse<T>> ok(String message, T data) {
-        return ResponseEntity.ok(
-                ApiResponse.<T>builder()
-                        .success(true)
-                        .message(message)
-                        .data(data)
-                        .build()
-        );
+    private <T> ApiResponse<T> success(String message, T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .message(message)
+                .data(data)
+                .build();
     }
 }
