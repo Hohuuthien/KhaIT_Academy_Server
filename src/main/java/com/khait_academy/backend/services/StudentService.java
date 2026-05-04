@@ -10,7 +10,6 @@ import com.khait_academy.backend.repositories.*;
 
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,35 +27,19 @@ public class StudentService {
     // ================= CREATE =================
     public StudentResponse create(StudentRequest request) {
 
-        if (studentRepository.existsByUserId(request.getUserId())) {
-            throw new BadRequestException("Student already exists for this user");
-        }
+        validateStudentNotExists(request.getUserId());
 
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found")
-                );
-
-        Parent parent = null;
-
-        if (request.getParentId() != null) {
-            parent = parentRepository.findById(request.getParentId())
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException("Parent not found")
-                    );
-        }
+        User user = getUserOrThrow(request.getUserId());
+        Parent parent = getParentIfExists(request.getParentId());
 
         Student student = StudentMapper.toEntity(request, user, parent);
 
-        return StudentMapper.toResponse(
-                studentRepository.save(student)
-        );
+        return StudentMapper.toResponse(studentRepository.save(student));
     }
 
     // ================= GET ALL =================
     @Transactional(readOnly = true)
     public List<StudentResponse> getAll() {
-
         return studentRepository.findAll()
                 .stream()
                 .map(StudentMapper::toResponse)
@@ -66,59 +49,64 @@ public class StudentService {
     // ================= GET BY ID =================
     @Transactional(readOnly = true)
     public StudentResponse getById(Long id) {
-
-        Student student = studentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Student not found")
-                );
-
-        return StudentMapper.toResponse(student);
+        return StudentMapper.toResponse(getStudentOrThrow(id));
     }
 
     // ================= UPDATE =================
     public StudentResponse update(Long id, StudentRequest request) {
 
-        Student student = studentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Student not found")
-                );
-
-        Parent parent = null;
-
-        if (request.getParentId() != null) {
-            parent = parentRepository.findById(request.getParentId())
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException("Parent not found")
-                    );
-        }
+        Student student = getStudentOrThrow(id);
+        Parent parent = getParentIfExists(request.getParentId());
 
         StudentMapper.updateEntity(student, request, parent);
 
-        return StudentMapper.toResponse(
-                studentRepository.save(student)
-        );
+        return StudentMapper.toResponse(studentRepository.save(student));
     }
 
     // ================= DELETE =================
     public void delete(Long id) {
-
-        Student student = studentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Student not found")
-                );
-
-        studentRepository.delete(student);
+        studentRepository.delete(getStudentOrThrow(id));
     }
 
     // ================= GET BY USER =================
     @Transactional(readOnly = true)
     public StudentResponse getByUserId(Long userId) {
-
         Student student = studentRepository.findByUserId(userId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Student not found")
                 );
 
         return StudentMapper.toResponse(student);
+    }
+
+    // ================= PRIVATE HELPERS =================
+
+    private Student getStudentOrThrow(Long id) {
+        return studentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Student not found")
+                );
+    }
+
+    private User getUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found")
+                );
+    }
+
+    private Parent getParentIfExists(Long parentId) {
+        if (parentId == null) return null;
+
+        return parentRepository.findById(parentId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Parent not found")
+                );
+    }
+
+    private void validateStudentNotExists(Long userId) {
+        if (studentRepository.existsByUserId(userId)) {
+            throw new BadRequestException("Student already exists for this user");
+        }
     }
 }

@@ -1,7 +1,10 @@
 package com.khait_academy.backend.dto.request;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import java.math.BigDecimal;
+
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -9,9 +12,10 @@ import lombok.Setter;
 @Setter
 public class GradeRequest {
 
-    @Min(0)
-    @Max(10)
-    private Double score;
+    @NotNull
+    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMax(value = "10.0", inclusive = true)
+    private BigDecimal score;
 
     private String feedback;
 }
