@@ -6,11 +6,15 @@ import com.khait_academy.backend.entities.Category;
 import com.khait_academy.backend.entities.Post;
 import com.khait_academy.backend.entities.User;
 import com.khait_academy.backend.enums.PostStatus;
+import com.khait_academy.backend.exception.BadRequestException;
+import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.PostMapper;
 import com.khait_academy.backend.repositories.CategoryRepository;
 import com.khait_academy.backend.repositories.PostRepository;
 import com.khait_academy.backend.repositories.UserRepository;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,19 +30,15 @@ public class PostService {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
 
-    // ===== CREATE =====
+    // ================= CREATE =================
+
     @Transactional
-    public PostResponse create(PostRequest request, Long authorId) {
+    public PostResponse create(PostRequest request, Long userId) {
 
-        if (postRepository.existsBySlug(request.getSlug())) {
-            throw new RuntimeException("Slug already exists");
-        }
+        validateSlug(request.getSlug());
 
-        User author = userRepository.findById(authorId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+        User author = getUser(userId);
+        Category category = getCategory(request.getCategoryId());
 
         Post post = Post.builder()
                 .title(request.getTitle())
@@ -50,17 +50,15 @@ public class PostService {
                 .status(request.getStatus())
                 .build();
 
-        // publish logic
-        if (request.getStatus() == PostStatus.PUBLISHED) {
-            post.setPublishedAt(LocalDateTime.now());
-        }
+        applyPublishLogic(post, request.getStatus());
 
-        post.setUpdatedAt(null);
-
-        return PostMapper.toResponse(postRepository.save(post));
+        return PostMapper.toResponse(
+                postRepository.save(post)
+        );
     }
 
-    // ===== GET ALL =====
+    // ================= GET =================
+
     public List<PostResponse> getAll() {
         return postRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
@@ -68,14 +66,10 @@ public class PostService {
                 .toList();
     }
 
-    // ===== GET BY SLUG =====
     public PostResponse getBySlug(String slug) {
-        return postRepository.findBySlug(slug)
-                .map(PostMapper::toResponse)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
+        return PostMapper.toResponse(getPost(slug));
     }
 
-    // ===== GET BY CATEGORY =====
     public List<PostResponse> getByCategory(Long categoryId) {
         return postRepository.findByCategoryIdOrderByCreatedAtDesc(categoryId)
                 .stream()
@@ -83,7 +77,6 @@ public class PostService {
                 .toList();
     }
 
-    // ===== GET BY STATUS =====
     public List<PostResponse> getByStatus(PostStatus status) {
         return postRepository.findByStatusOrderByCreatedAtDesc(status)
                 .stream()
@@ -91,41 +84,94 @@ public class PostService {
                 .toList();
     }
 
-    // ===== UPDATE =====
+    // ================= UPDATE =================
+
     @Transactional
     public PostResponse update(Long id, PostRequest request) {
 
-        Post post = postRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
+        Post post = getPost(id);
 
-        // check slug duplicate
-        if (!post.getSlug().equals(request.getSlug())
-                && postRepository.existsBySlug(request.getSlug())) {
-            throw new RuntimeException("Slug already exists");
-        }
+        validateSlugForUpdate(post, request.getSlug());
+
+        Category category = getCategory(request.getCategoryId());
 
         post.setTitle(request.getTitle());
         post.setSlug(request.getSlug());
         post.setThumbnail(request.getThumbnail());
         post.setContent(request.getContent());
-        post.setStatus(request.getStatus());
+        post.setCategory(category);
 
-        // publish logic
-        if (request.getStatus() == PostStatus.PUBLISHED && post.getPublishedAt() == null) {
-            post.setPublishedAt(LocalDateTime.now());
-        }
+        updateStatus(post, request.getStatus());
 
         post.setUpdatedAt(LocalDateTime.now());
 
-        return PostMapper.toResponse(postRepository.save(post));
+        return PostMapper.toResponse(
+                postRepository.save(post)
+        );
     }
 
-    // ===== DELETE =====
+    // ================= DELETE =================
+
     @Transactional
     public void delete(Long id) {
-        if (!postRepository.existsById(id)) {
-            throw new RuntimeException("Post not found");
+
+        Post post = getPost(id);
+
+        postRepository.delete(post);
+    }
+
+    // ================= PRIVATE HELPERS =================
+
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found"));
+    }
+
+    private Category getCategory(Long categoryId) {
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Category not found"));
+    }
+
+    private Post getPost(Long id) {
+        return postRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Post not found"));
+    }
+
+    private Post getPost(String slug) {
+        return postRepository.findBySlug(slug)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Post not found"));
+    }
+
+    private void validateSlug(String slug) {
+        if (postRepository.existsBySlug(slug)) {
+            throw new BadRequestException("Slug already exists");
         }
-        postRepository.deleteById(id);
+    }
+
+    private void validateSlugForUpdate(Post post, String slug) {
+        if (!post.getSlug().equals(slug)
+                && postRepository.existsBySlug(slug)) {
+            throw new BadRequestException("Slug already exists");
+        }
+    }
+
+    private void applyPublishLogic(Post post, PostStatus status) {
+        if (status == PostStatus.PUBLISHED) {
+            post.setPublishedAt(LocalDateTime.now());
+        }
+    }
+
+    private void updateStatus(Post post, PostStatus newStatus) {
+
+        if (post.getStatus() != PostStatus.PUBLISHED
+                && newStatus == PostStatus.PUBLISHED) {
+            post.setPublishedAt(LocalDateTime.now());
+        }
+
+        post.setStatus(newStatus);
     }
 }

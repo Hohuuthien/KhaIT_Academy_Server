@@ -1,33 +1,54 @@
 package com.khait_academy.backend.constants;
 
-public class SecurityEndpoints {
+public final class SecurityEndpoints {
 
-    // ===== PUBLIC =====
+    // ================= PUBLIC =================
+
     public static final String[] PUBLIC = {
-        "/api/auth/**"
+            "/api/auth/**"
     };
 
     public static final String[] PUBLIC_GET = {
-        "/api/courses/**",
-        "/api/categories/**",
-        "/api/lessons/**"
+            "/api/courses/**",
+            "/api/categories/**",
+            "/api/posts/**"
     };
 
-    // ===== AUTH =====
+    // ================= AUTHENTICATED =================
+
     public static final String[] ENROLLMENT = {
-        "/api/enrollments/**"
+            "/api/enrollments/**"
     };
-    public static final String[] STUDENT ={
-        "/api/students/**"
+
+    public static final String[] STUDENT = {
+            "/api/students/**"
     };
-    // ===== ADMIN =====
+
+    public static final String[] LESSON_PROGRESS = {
+            "/api/lesson-progress/**"
+    };
+
+    // ================= CONTENT MANAGEMENT =================
+
+    public static final String[] POST = {
+            "/api/posts/**"
+    };
+
+    public static final String[] LESSON = {
+            "/api/lessons/**"
+    };
+
+    public static final String[] COURSE = {
+            "/api/courses/**"
+    };
+
+    // ================= ADMIN =================
+
     public static final String ADMIN = "/api/admin/**";
 
-    // ===== COURSE =====
-    public static final String COURSE = "/api/courses/**";
-
-    // ===== LESSON =====
-    public static final String LESSON = "/api/lessons/**";
-
-    private SecurityEndpoints() {}
+    private SecurityEndpoints() {
+        throw new UnsupportedOperationException(
+                "Utility class"
+        );
+    }
 }
