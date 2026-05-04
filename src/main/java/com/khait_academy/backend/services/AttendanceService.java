@@ -14,10 +14,10 @@ import com.khait_academy.backend.repositories.StudentRepository;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -28,21 +28,13 @@ public class AttendanceService {
     private final StudentRepository studentRepository;
     private final LessonRepository lessonRepository;
 
-    // ================= CREATE =================
-    public AttendanceResponse create(AttendanceRequest request) {
+    // ================= CHECK-IN =================
+    public AttendanceResponse checkIn(AttendanceRequest request) {
 
-        if (attendanceRepository.findByStudentIdAndLessonId(
-                request.getStudentId(),
-                request.getLessonId()
-        ).isPresent()) {
-            throw new BadRequestException("Attendance already exists for this student & lesson");
-        }
+        validateNotExists(request.getStudentId(), request.getLessonId());
 
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
-
-        Lesson lesson = lessonRepository.findById(request.getLessonId())
-                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
+        Student student = getStudentOrThrow(request.getStudentId());
+        Lesson lesson = getLessonOrThrow(request.getLessonId());
 
         Attendance attendance = AttendanceMapper.toEntity(request, student, lesson);
 
@@ -51,64 +43,90 @@ public class AttendanceService {
         );
     }
 
-    // ================= GET ALL =================
-    @Transactional(readOnly = true)
-    public List<AttendanceResponse> getAll() {
-        return attendanceRepository.findAll()
-                .stream()
-                .map(AttendanceMapper::toResponse)
-                .toList();
-    }
-
     // ================= GET BY ID =================
     @Transactional(readOnly = true)
     public AttendanceResponse getById(Long id) {
-
-        Attendance attendance = attendanceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Attendance not found"));
-
-        return AttendanceMapper.toResponse(attendance);
+        return AttendanceMapper.toResponse(getAttendanceOrThrow(id));
     }
 
-    // ================= UPDATE =================
-    public AttendanceResponse update(Long id, AttendanceRequest request) {
+    // ================= GET ALL =================
+    @Transactional(readOnly = true)
+    public Page<AttendanceResponse> getAll(Pageable pageable) {
 
-        Attendance attendance = attendanceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Attendance not found"));
+        return attendanceRepository.findAll(pageable)
+                .map(AttendanceMapper::toResponse);
+    }
 
-        AttendanceMapper.updateEntity(attendance, request);
+    // ================= GET BY STUDENT =================
+    @Transactional(readOnly = true)
+    public Page<AttendanceResponse> getByStudent(Long studentId, Pageable pageable) {
 
-        return AttendanceMapper.toResponse(
-                attendanceRepository.save(attendance)
-        );
+        validateStudentExists(studentId);
+
+        return attendanceRepository
+                .findByStudentId(studentId, pageable)
+                .map(AttendanceMapper::toResponse);
+    }
+
+    // ================= GET BY LESSON =================
+    @Transactional(readOnly = true)
+    public Page<AttendanceResponse> getByLesson(Long lessonId, Pageable pageable) {
+
+        validateLessonExists(lessonId);
+
+        return attendanceRepository
+                .findByLessonId(lessonId, pageable)
+                .map(AttendanceMapper::toResponse);
     }
 
     // ================= DELETE =================
     public void delete(Long id) {
-
-        Attendance attendance = attendanceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Attendance not found"));
-
-        attendanceRepository.delete(attendance);
+        attendanceRepository.delete(getAttendanceOrThrow(id));
     }
 
-    // ================= BY STUDENT =================
-    @Transactional(readOnly = true)
-    public List<AttendanceResponse> getByStudent(Long studentId) {
+    // ================= HELPERS =================
 
-        return attendanceRepository.findByStudentId(studentId)
-                .stream()
-                .map(AttendanceMapper::toResponse)
-                .toList();
+    private Attendance getAttendanceOrThrow(Long id) {
+        return attendanceRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Attendance not found")
+                );
     }
 
-    // ================= BY LESSON =================
-    @Transactional(readOnly = true)
-    public List<AttendanceResponse> getByLesson(Long lessonId) {
+    private Student getStudentOrThrow(Long id) {
+        return studentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Student not found")
+                );
+    }
 
-        return attendanceRepository.findByLessonId(lessonId)
-                .stream()
-                .map(AttendanceMapper::toResponse)
-                .toList();
+    private Lesson getLessonOrThrow(Long id) {
+        return lessonRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Lesson not found")
+                );
+    }
+
+    private void validateNotExists(Long studentId, Long lessonId) {
+        if (attendanceRepository
+                .findByStudentIdAndLessonId(studentId, lessonId)
+                .isPresent()) {
+
+            throw new BadRequestException(
+                    "Attendance already exists for this student & lesson"
+            );
+        }
+    }
+
+    private void validateStudentExists(Long studentId) {
+        if (!studentRepository.existsById(studentId)) {
+            throw new ResourceNotFoundException("Student not found");
+        }
+    }
+
+    private void validateLessonExists(Long lessonId) {
+        if (!lessonRepository.existsById(lessonId)) {
+            throw new ResourceNotFoundException("Lesson not found");
+        }
     }
 }

@@ -5,13 +5,12 @@ import com.khait_academy.backend.dto.response.SubmissionResponse;
 import com.khait_academy.backend.entities.Assignment;
 import com.khait_academy.backend.entities.Student;
 import com.khait_academy.backend.entities.Submission;
-import com.khait_academy.backend.entities.User;
 import com.khait_academy.backend.enums.SubmissionStatus;
+import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.SubmissionMapper;
 import com.khait_academy.backend.repositories.AssignmentRepository;
 import com.khait_academy.backend.repositories.StudentRepository;
 import com.khait_academy.backend.repositories.SubmissionRepository;
-import com.khait_academy.backend.repositories.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +20,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Service
@@ -32,59 +32,138 @@ public class SubmissionService {
     private final StudentRepository studentRepository;
     private final AssignmentRepository assignmentRepository;
 
-    public SubmissionResponse submit(SubmissionRequest request, Authentication authentication) {
+    // ================= SUBMIT =================
+    public SubmissionResponse submit(SubmissionRequest request, Authentication auth) {
 
-        String email = authentication.getName();
+        Student student = getStudentByEmail(auth.getName());
+        Assignment assignment = getAssignmentOrThrow(request.getAssignmentId());
 
-        Student student = studentRepository.findByUser_Email(email)
-                .orElseThrow(() -> new RuntimeException("Student not found"));
+        Submission submission = getOrCreateSubmission(student, assignment);
 
-        Assignment assignment = assignmentRepository.findById(request.getAssignmentId())
-                .orElseThrow(() -> new RuntimeException("Assignment not found"));
-
-        Submission submission = submissionRepository
-                .findByStudent_IdAndAssignment_Id(student.getId(), assignment.getId())
-                .orElseGet(() -> Submission.builder()
-                        .student(student)
-                        .assignment(assignment)
-                        .build()
-                );
-
-        submission.setFileUrl(request.getFileUrl());
-        submission.setSubmittedAt(LocalDateTime.now());
-
-        if (assignment.getDueDate() != null &&
-                LocalDateTime.now().isAfter(assignment.getDueDate())) {
-            submission.setStatus(SubmissionStatus.LATE);
-        } else {
-            submission.setStatus(SubmissionStatus.SUBMITTED);
-        }
+        updateSubmission(submission, request, assignment);
 
         return SubmissionMapper.toResponse(submissionRepository.save(submission));
     }
 
+    // ================= MY SUBMISSIONS =================
     @Transactional(readOnly = true)
-    public Page<SubmissionResponse> getMySubmissions(Authentication authentication, Pageable pageable) {
+    public Page<SubmissionResponse> getMySubmissions(Authentication auth, Pageable pageable) {
 
-        String email = authentication.getName();
-
-        Student student = studentRepository.findByUser_Email(email)
-                .orElseThrow(() -> new RuntimeException("Student not found"));
+        Student student = getStudentByEmail(auth.getName());
 
         return submissionRepository
                 .findByStudent_Id(student.getId(), pageable)
                 .map(SubmissionMapper::toResponse);
     }
 
+    // ================= BY STUDENT =================
     @Transactional(readOnly = true)
     public Page<SubmissionResponse> getByStudent(Long studentId, Pageable pageable) {
 
-        if (!studentRepository.existsById(studentId)) {
-            throw new RuntimeException("Student not found");
-        }
+        validateStudentExists(studentId);
 
         return submissionRepository
                 .findByStudent_Id(studentId, pageable)
                 .map(SubmissionMapper::toResponse);
     }
+
+    // ================= GET BY ID =================
+    @Transactional(readOnly = true)
+    public SubmissionResponse getById(Long id) {
+
+        Submission submission = getSubmissionOrThrow(id);
+
+        return SubmissionMapper.toResponse(submission);
+    }
+
+    // ================= GRADE =================
+    public SubmissionResponse grade(Long submissionId, BigDecimal score, String feedback) {
+
+        Submission submission = getSubmissionOrThrow(submissionId);
+
+        submission.setScore(score);
+        submission.setFeedback(feedback);
+        submission.setGradedAt(LocalDateTime.now());
+        submission.setStatus(SubmissionStatus.GRADED);
+
+        return SubmissionMapper.toResponse(submissionRepository.save(submission));
+    }
+
+    // ================= DELETE =================
+    public void delete(Long id) {
+
+        Submission submission = getSubmissionOrThrow(id);
+
+        submissionRepository.delete(submission);
+    }
+
+    // ================= HELPERS =================
+
+    private Student getStudentByEmail(String email) {
+        return studentRepository.findByUser_Email(email)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Student not found")
+                );
+    }
+
+    private Assignment getAssignmentOrThrow(Long id) {
+        return assignmentRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Assignment not found")
+                );
+    }
+
+    private Submission getSubmissionOrThrow(Long id) {
+        return submissionRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Submission not found")
+                );
+    }
+
+    private Submission getOrCreateSubmission(Student student, Assignment assignment) {
+        return submissionRepository
+                .findByStudent_IdAndAssignment_Id(student.getId(), assignment.getId())
+                .orElseGet(() -> Submission.builder()
+                        .student(student)
+                        .assignment(assignment)
+                        .build()
+                );
+    }
+
+    private void updateSubmission(Submission submission,
+                                  SubmissionRequest request,
+                                  Assignment assignment) {
+
+        submission.setFileUrl(request.getFileUrl());
+        submission.setSubmittedAt(LocalDateTime.now());
+
+        submission.setStatus(isLate(assignment)
+                ? SubmissionStatus.LATE
+                : SubmissionStatus.SUBMITTED
+        );
+    }
+
+    private boolean isLate(Assignment assignment) {
+        return assignment.getDueDate() != null
+                && LocalDateTime.now().isAfter(assignment.getDueDate());
+    }
+
+    private void validateStudentExists(Long studentId) {
+        if (!studentRepository.existsById(studentId)) {
+            throw new ResourceNotFoundException("Student not found");
+        }
+    }
+
+    @Transactional(readOnly = true)
+        public Page<SubmissionResponse> getByAssignment(Long assignmentId, Pageable pageable) {
+
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Assignment not found")
+                );
+
+        return submissionRepository
+                .findByAssignment_Id(assignment.getId(), pageable)
+                .map(SubmissionMapper::toResponse);
+        }
 }

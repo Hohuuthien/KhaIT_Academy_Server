@@ -3,7 +3,6 @@ package com.khait_academy.backend.controllers;
 import com.khait_academy.backend.dto.request.StudentRequest;
 import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.StudentResponse;
-import com.khait_academy.backend.exception.BadRequestException;
 import com.khait_academy.backend.services.StudentService;
 
 import jakarta.validation.Valid;
@@ -31,26 +30,19 @@ public class StudentController {
 
         return ResponseEntity
                 .created(URI.create("/api/students/" + response.getId()))
-                .body(
-                        ApiResponse.<StudentResponse>builder()
-                                .success(true)
-                                .message("Create student successfully")
-                                .data(response)
-                                .build()
-                );
+                .body(ApiResponse.success("Create student successfully", response));
     }
 
     // ================= GET ALL =================
     @GetMapping
     public ResponseEntity<ApiResponse<List<StudentResponse>>> getAll() {
 
-        List<StudentResponse> responses = studentService.getAll();
+        List<StudentResponse> data = studentService.getAll();
 
-        return ok(
-                responses.isEmpty()
-                        ? "No students found"
-                        : "Get students successfully",
-                responses
+        return ResponseEntity.ok(
+                data.isEmpty()
+                        ? ApiResponse.success("No students found", data)
+                        : ApiResponse.success("Get students successfully", data)
         );
     }
 
@@ -59,11 +51,11 @@ public class StudentController {
     public ResponseEntity<ApiResponse<StudentResponse>> getById(
             @PathVariable Long id) {
 
-        validateId(id, "student");
-
         StudentResponse response = studentService.getById(id);
 
-        return ok("Get student successfully", response);
+        return ResponseEntity.ok(
+                ApiResponse.success("Get student successfully", response)
+        );
     }
 
     // ================= UPDATE =================
@@ -72,11 +64,11 @@ public class StudentController {
             @PathVariable Long id,
             @Valid @RequestBody StudentRequest request) {
 
-        validateId(id, "student");
-
         StudentResponse response = studentService.update(id, request);
 
-        return ok("Update student successfully", response);
+        return ResponseEntity.ok(
+                ApiResponse.success("Update student successfully", response)
+        );
     }
 
     // ================= DELETE =================
@@ -84,40 +76,22 @@ public class StudentController {
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable Long id) {
 
-        validateId(id, "student");
-
         studentService.delete(id);
 
-        return ok("Delete student successfully", null);
+        return ResponseEntity.ok(
+                ApiResponse.success("Delete student successfully", null)
+        );
     }
 
-    // ================= GET BY USER ID =================
+    // ================= GET BY USER =================
     @GetMapping("/user/{userId}")
     public ResponseEntity<ApiResponse<StudentResponse>> getByUserId(
             @PathVariable Long userId) {
 
-        validateId(userId, "user");
-
         StudentResponse response = studentService.getByUserId(userId);
 
-        return ok("Get student by user successfully", response);
-    }
-
-    // ================= COMMON RESPONSE =================
-    private <T> ResponseEntity<ApiResponse<T>> ok(String message, T data) {
         return ResponseEntity.ok(
-                ApiResponse.<T>builder()
-                        .success(true)
-                        .message(message)
-                        .data(data)
-                        .build()
+                ApiResponse.success("Get student by user successfully", response)
         );
-    }
-
-    // ================= VALIDATE ID =================
-    private void validateId(Long id, String fieldName) {
-        if (id == null || id <= 0) {
-            throw new BadRequestException("Invalid " + fieldName + " id");
-        }
     }
 }

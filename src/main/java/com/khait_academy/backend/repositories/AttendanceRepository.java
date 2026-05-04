@@ -2,18 +2,21 @@ package com.khait_academy.backend.repositories;
 
 import com.khait_academy.backend.entities.Attendance;
 import com.khait_academy.backend.enums.AttendanceStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
-    List<Attendance> findByStudentId(Long studentId);
+    // ================= PAGINATION =================
+    Page<Attendance> findByStudentId(Long studentId, Pageable pageable);
 
-    List<Attendance> findByLessonId(Long lessonId);
+    Page<Attendance> findByLessonId(Long lessonId, Pageable pageable);
 
-    List<Attendance> findByStatus(AttendanceStatus status);
+    Page<Attendance> findByStatus(AttendanceStatus status, Pageable pageable);
 
+    // ================= VALIDATION =================
     Optional<Attendance> findByStudentIdAndLessonId(Long studentId, Long lessonId);
 }
