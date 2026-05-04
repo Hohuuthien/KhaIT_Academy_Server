@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -31,28 +32,16 @@ public class EnrollmentService {
     // ================= CREATE =================
     public EnrollmentResponse create(EnrollmentRequest request) {
 
-        if (enrollmentRepository.existsByStudent_IdAndCourse_Id(
-                request.getStudentId(),
-                request.getCourseId()
-        )) {
-            throw new BadRequestException("Student already enrolled in this course");
-        }
+        validateNotEnrolled(request.getStudentId(), request.getCourseId());
 
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Student not found")
-                );
-
-        Course course = courseRepository.findById(request.getCourseId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Course not found")
-                );
+        Student student = getStudent(request.getStudentId());
+        Course course = getCourse(request.getCourseId());
 
         Enrollment enrollment = EnrollmentMapper.toEntity(request, student, course);
 
-        return EnrollmentMapper.toResponse(
-                enrollmentRepository.save(enrollment)
-        );
+        enrollment.setPriceAtPurchase(resolveCoursePrice(course));
+
+        return toResponse(enrollmentRepository.save(enrollment));
     }
 
     // ================= GET ALL =================
@@ -60,65 +49,81 @@ public class EnrollmentService {
     public List<EnrollmentResponse> getAll() {
         return enrollmentRepository.findAll()
                 .stream()
-                .map(EnrollmentMapper::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
     // ================= GET BY ID =================
     @Transactional(readOnly = true)
     public EnrollmentResponse getById(Long id) {
-
-        Enrollment enrollment = enrollmentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Enrollment not found")
-                );
-
-        return EnrollmentMapper.toResponse(enrollment);
+        return toResponse(getEnrollment(id));
     }
 
     // ================= UPDATE =================
     public EnrollmentResponse update(Long id, EnrollmentRequest request) {
 
-        Enrollment enrollment = enrollmentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Enrollment not found")
-                );
+        Enrollment enrollment = getEnrollment(id);
 
         EnrollmentMapper.updateEntity(enrollment, request);
 
-        return EnrollmentMapper.toResponse(
-                enrollmentRepository.save(enrollment)
-        );
+        // ❗ KHÔNG cho update price (giữ lịch sử)
+        return toResponse(enrollmentRepository.save(enrollment));
     }
 
     // ================= DELETE =================
     public void delete(Long id) {
-
-        Enrollment enrollment = enrollmentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Enrollment not found")
-                );
-
-        enrollmentRepository.delete(enrollment);
+        enrollmentRepository.delete(getEnrollment(id));
     }
 
     // ================= BY STUDENT =================
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getByStudent(Long studentId) {
-
         return enrollmentRepository.findByStudent_Id(studentId)
                 .stream()
-                .map(EnrollmentMapper::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
     // ================= BY COURSE =================
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> getByCourse(Long courseId) {
-
         return enrollmentRepository.findByCourse_Id(courseId)
                 .stream()
-                .map(EnrollmentMapper::toResponse)
+                .map(this::toResponse)
                 .toList();
+    }
+
+    // ================= PRIVATE METHODS =================
+
+    private void validateNotEnrolled(Long studentId, Long courseId) {
+        if (enrollmentRepository.existsByStudent_IdAndCourse_Id(studentId, courseId)) {
+            throw new BadRequestException("Student already enrolled in this course");
+        }
+    }
+
+    private Student getStudent(Long id) {
+        return studentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+    }
+
+    private Course getCourse(Long id) {
+        return courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+    }
+
+    private Enrollment getEnrollment(Long id) {
+        return enrollmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
+    }
+
+    private BigDecimal resolveCoursePrice(Course course) {
+        if (course.getPrice() == null) {
+            throw new BadRequestException("Course price is missing");
+        }
+        return course.getPrice();
+    }
+
+    private EnrollmentResponse toResponse(Enrollment enrollment) {
+        return EnrollmentMapper.toResponse(enrollment);
     }
 }
