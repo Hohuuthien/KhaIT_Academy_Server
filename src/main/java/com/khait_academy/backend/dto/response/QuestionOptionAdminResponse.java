@@ -8,6 +8,8 @@ import lombok.Data;
 public class QuestionOptionAdminResponse {
 
     private Long id;
+
     private String content;
-    private boolean isCorrect;
+
+    private boolean correct;
 }

@@ -1,6 +1,7 @@
 package com.khait_academy.backend.dto.response;
 
 import com.khait_academy.backend.enums.QuestionType;
+
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,17 +11,18 @@ import java.util.List;
 @Builder
 public class QuestionResponse {
 
-    // ===== IDENTIFIER =====
+    // ================= IDENTIFIER =================
+
     private Long id;
+    private Long quizId;
 
-    private Long quizId;      // ✅ đúng quan hệ
-    private Long lessonId;    // ✅ optional (derived)
+    // ================= CONTENT =================
 
-    // ===== CONTENT =====
     private String content;
     private QuestionType type;
     private Integer score;
 
-    // ===== OPTIONS =====
+    // ================= OPTIONS =================
+
     private List<QuestionOptionResponse> options;
 }

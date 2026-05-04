@@ -1,59 +1,106 @@
 package com.khait_academy.backend.mapper;
 
-
+import com.khait_academy.backend.dto.request.QuestionOptionRequest;
 import com.khait_academy.backend.dto.request.QuestionRequest;
-import com.khait_academy.backend.dto.response.*;
-import com.khait_academy.backend.entities.*;
+import com.khait_academy.backend.dto.response.QuestionOptionResponse;
+import com.khait_academy.backend.dto.response.QuestionResponse;
+import com.khait_academy.backend.entities.Question;
+import com.khait_academy.backend.entities.QuestionOption;
+import com.khait_academy.backend.entities.Quiz;
+import com.khait_academy.backend.enums.QuestionType;
 
 import java.util.List;
 
-public class QuestionMapper {
+public final class QuestionMapper {
+
+    private QuestionMapper() {
+    }
 
     // ================= TO ENTITY =================
-    public static Question toEntity(QuestionRequest req, Quiz quiz) {
 
+    public static Question toEntity(
+            QuestionRequest request,
+            Quiz quiz
+    ) {
         Question question = Question.builder()
                 .quiz(quiz)
-                .content(req.getContent())
-                .type(req.getType())
-                .score(req.getScore())
+                .content(request.getContent())
+                .type(resolveType(request))
+                .score(resolveScore(request))
                 .build();
 
-        List<QuestionOption> options = req.getOptions().stream()
-                .map(o -> QuestionOption.builder()
-                        .question(question)
-                        .content(o.getContent())
-                        .isCorrect(o.isCorrect())
-                        .build()
-                )
-                .toList();
-
-        question.setOptions(options);
+        mapOptions(question, request.getOptions());
 
         return question;
     }
 
     // ================= TO RESPONSE =================
-    public static QuestionResponse toResponse(Question q) {
 
+    public static QuestionResponse toResponse(Question question) {
         return QuestionResponse.builder()
-                .id(q.getId())
-                .quizId(q.getQuiz().getId()) // 🔥 FIX
-                .content(q.getContent())
-                .type(q.getType())
-                .score(q.getScore())
-
+                .id(question.getId())
+                .quizId(question.getQuiz().getId())
+                .content(question.getContent())
+                .type(question.getType())
+                .score(question.getScore())
                 .options(
-                        q.getOptions() == null
+                        question.getOptions() == null
                                 ? List.of()
-                                : q.getOptions().stream()
-                                .map(o -> QuestionOptionResponse.builder()
-                                        .id(o.getId())
-                                        .content(o.getContent())
-                                        .build()
-                                )
+                                : question.getOptions()
+                                .stream()
+                                .map(QuestionMapper::toOptionResponse)
                                 .toList()
                 )
+                .build();
+    }
+
+    // ================= PRIVATE HELPERS =================
+
+    private static QuestionType resolveType(
+            QuestionRequest request
+    ) {
+        return request.getType() != null
+                ? request.getType()
+                : QuestionType.MULTIPLE_CHOICE;
+    }
+
+    private static Integer resolveScore(
+            QuestionRequest request
+    ) {
+        return request.getScore() != null
+                ? request.getScore()
+                : 1;
+    }
+
+    private static void mapOptions(
+            Question question,
+            List<QuestionOptionRequest> options
+    ) {
+        if (options == null || options.isEmpty()) {
+            return;
+        }
+
+        options.stream()
+                .map(QuestionMapper::toOptionEntity)
+                .forEach(question::addOption);
+    }
+
+    private static QuestionOption toOptionEntity(
+            QuestionOptionRequest request
+    ) {
+        return QuestionOption.builder()
+                .content(request.getContent())
+                .correct(request.isCorrect())
+                .build();
+    }
+
+    private static QuestionOptionResponse toOptionResponse(
+            QuestionOption option
+    ) {
+        return QuestionOptionResponse.builder()
+                .id(option.getId())
+                .content(option.getContent())
+                .correct(option.isCorrect())
                 .build();
     }
 }
