@@ -4,11 +4,15 @@ import com.khait_academy.backend.dto.request.PostRequest;
 import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.PostResponse;
 import com.khait_academy.backend.enums.PostStatus;
+import com.khait_academy.backend.security.UserPrincipal;
 import com.khait_academy.backend.services.PostService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,13 +24,20 @@ public class PostController {
 
     private final PostService postService;
 
-    // ===== CREATE =====
+    /**
+     * CREATE POST
+     * Author lấy từ JWT
+     */
     @PostMapping
     public ResponseEntity<ApiResponse<PostResponse>> create(
-            @RequestBody @Valid PostRequest request,
-            @RequestParam Long authorId // TODO: replace bằng JWT
+            @Valid @RequestBody PostRequest request,
+            @AuthenticationPrincipal UserPrincipal user
     ) {
-        PostResponse result = postService.create(request, authorId);
+
+        PostResponse result = postService.create(
+                request,
+                user.getId()
+        );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.<PostResponse>builder()
@@ -37,90 +48,98 @@ public class PostController {
         );
     }
 
-    // ===== GET ALL =====
+    /**
+     * GET ALL POSTS
+     */
     @GetMapping
     public ResponseEntity<ApiResponse<List<PostResponse>>> getAll() {
-        List<PostResponse> result = postService.getAll();
 
         return ResponseEntity.ok(
                 ApiResponse.<List<PostResponse>>builder()
                         .success(true)
                         .message("Get all posts success")
-                        .data(result)
+                        .data(postService.getAll())
                         .build()
         );
     }
 
-    // ===== GET BY SLUG =====
+    /**
+     * GET POST BY SLUG
+     */
     @GetMapping("/{slug}")
     public ResponseEntity<ApiResponse<PostResponse>> getBySlug(
             @PathVariable String slug
     ) {
-        PostResponse result = postService.getBySlug(slug);
 
         return ResponseEntity.ok(
                 ApiResponse.<PostResponse>builder()
                         .success(true)
                         .message("Get post success")
-                        .data(result)
+                        .data(postService.getBySlug(slug))
                         .build()
         );
     }
 
-    // ===== GET BY STATUS =====
+    /**
+     * GET POSTS BY STATUS
+     */
     @GetMapping("/status/{status}")
     public ResponseEntity<ApiResponse<List<PostResponse>>> getByStatus(
             @PathVariable PostStatus status
     ) {
-        List<PostResponse> result = postService.getByStatus(status);
 
         return ResponseEntity.ok(
                 ApiResponse.<List<PostResponse>>builder()
                         .success(true)
                         .message("Get posts by status success")
-                        .data(result)
+                        .data(postService.getByStatus(status))
                         .build()
         );
     }
 
-    // ===== GET BY CATEGORY =====
+    /**
+     * GET POSTS BY CATEGORY
+     */
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<ApiResponse<List<PostResponse>>> getByCategory(
             @PathVariable Long categoryId
     ) {
-        List<PostResponse> result = postService.getByCategory(categoryId);
 
         return ResponseEntity.ok(
                 ApiResponse.<List<PostResponse>>builder()
                         .success(true)
                         .message("Get posts by category success")
-                        .data(result)
+                        .data(postService.getByCategory(categoryId))
                         .build()
         );
     }
 
-    // ===== UPDATE =====
+    /**
+     * UPDATE POST
+     */
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<PostResponse>> update(
             @PathVariable Long id,
-            @RequestBody @Valid PostRequest request
+            @Valid @RequestBody PostRequest request
     ) {
-        PostResponse result = postService.update(id, request);
 
         return ResponseEntity.ok(
                 ApiResponse.<PostResponse>builder()
                         .success(true)
                         .message("Update post success")
-                        .data(result)
+                        .data(postService.update(id, request))
                         .build()
         );
     }
 
-    // ===== DELETE =====
+    /**
+     * DELETE POST
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable Long id
     ) {
+
         postService.delete(id);
 
         return ResponseEntity.ok(
