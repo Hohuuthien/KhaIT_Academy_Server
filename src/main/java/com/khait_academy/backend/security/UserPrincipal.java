@@ -16,7 +16,7 @@ public class UserPrincipal implements UserDetails {
     private final Long id;
     private final String email;
     private final String passwordHash;
-    private final String fullName; // ✅ thêm field cần thiết
+    private final String fullName; 
     private final Collection<? extends GrantedAuthority> authorities;
 
     private UserPrincipal(Long id,

@@ -2,10 +2,14 @@ package com.khait_academy.backend.services;
 
 import com.khait_academy.backend.dto.request.LessonProgressRequest;
 import com.khait_academy.backend.dto.response.LessonProgressResponse;
-import com.khait_academy.backend.entities.*;
+import com.khait_academy.backend.entities.Lesson;
+import com.khait_academy.backend.entities.LessonProgress;
+import com.khait_academy.backend.entities.Student;
 import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.LessonProgressMapper;
-import com.khait_academy.backend.repositories.*;
+import com.khait_academy.backend.repositories.LessonProgressRepository;
+import com.khait_academy.backend.repositories.LessonRepository;
+import com.khait_academy.backend.repositories.StudentRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,36 +27,45 @@ public class LessonProgressService {
     private final StudentRepository studentRepository;
     private final LessonRepository lessonRepository;
 
-    // ================= CREATE / UPDATE (UPSERT) =================
-    public LessonProgressResponse saveOrUpdate(LessonProgressRequest request) {
+    /**
+     * CREATE OR UPDATE PROGRESS
+     */
+    public LessonProgressResponse saveOrUpdate(
+            Long userId,
+            LessonProgressRequest request
+    ) {
 
-        Student student = studentRepository.findById(request.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found"));
+        Student student = getStudentByUserId(userId);
+        Lesson lesson = getLesson(request.getLessonId());
 
-        Lesson lesson = lessonRepository.findById(request.getLessonId())
-                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
+        LessonProgress progress = lessonProgressRepository
+                .findByStudentIdAndLessonId(
+                        student.getId(),
+                        lesson.getId()
+                )
+                .orElseGet(() -> buildNewProgress(student, lesson));
 
-        LessonProgress lp = lessonProgressRepository
-                .findByStudentIdAndLessonId(request.getStudentId(), request.getLessonId())
-                .orElse(LessonProgress.builder()
-                        .student(student)
-                        .lesson(lesson)
-                        .build());
+        updateProgress(progress, request);
 
-        if (request.getProgress() != null) {
-            lp.setProgress(request.getProgress());
-        }
+        LessonProgress saved = lessonProgressRepository.save(progress);
 
-        if (request.getLastPosition() != null) {
-            lp.setLastPosition(request.getLastPosition());
-        }
-
-        return LessonProgressMapper.toResponse(
-                lessonProgressRepository.save(lp)
-        );
+        return LessonProgressMapper.toResponse(saved);
     }
 
-    // ================= GET BY STUDENT =================
+    /**
+     * GET MY PROGRESS
+     */
+    @Transactional(readOnly = true)
+    public List<LessonProgressResponse> getMyProgress(Long userId) {
+
+        Student student = getStudentByUserId(userId);
+
+        return getByStudent(student.getId());
+    }
+
+    /**
+     * GET PROGRESS BY STUDENT
+     */
     @Transactional(readOnly = true)
     public List<LessonProgressResponse> getByStudent(Long studentId) {
 
@@ -62,7 +75,9 @@ public class LessonProgressService {
                 .toList();
     }
 
-    // ================= GET BY LESSON =================
+    /**
+     * GET PROGRESS BY LESSON
+     */
     @Transactional(readOnly = true)
     public List<LessonProgressResponse> getByLesson(Long lessonId) {
 
@@ -72,12 +87,70 @@ public class LessonProgressService {
                 .toList();
     }
 
-    // ================= DELETE =================
+    /**
+     * DELETE
+     */
     public void delete(Long id) {
 
-        LessonProgress lp = lessonProgressRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("LessonProgress not found"));
+        LessonProgress progress = lessonProgressRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("LessonProgress not found"));
 
-        lessonProgressRepository.delete(lp);
+        lessonProgressRepository.delete(progress);
+    }
+
+    // ================= PRIVATE HELPERS =================
+
+    private Student getStudentByUserId(Long userId) {
+        return studentRepository.findByUserId(userId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Student not found"));
+    }
+
+    private Lesson getLesson(Long lessonId) {
+        return lessonRepository.findById(lessonId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Lesson not found"));
+    }
+
+    private LessonProgress buildNewProgress(Student student, Lesson lesson) {
+        return LessonProgress.builder()
+                .student(student)
+                .lesson(lesson)
+                .progress(0)
+                .lastPosition(0)
+                .build();
+    }
+
+    private void updateProgress(
+            LessonProgress progress,
+            LessonProgressRequest request
+    ) {
+
+        if (request.getProgress() != null) {
+            validateProgress(request.getProgress());
+            progress.setProgress(request.getProgress());
+        }
+
+        if (request.getLastPosition() != null) {
+            validateLastPosition(request.getLastPosition());
+            progress.setLastPosition(request.getLastPosition());
+        }
+    }
+
+    private void validateProgress(Integer progress) {
+        if (progress < 0 || progress > 100) {
+            throw new IllegalArgumentException(
+                    "Progress must be between 0 and 100"
+            );
+        }
+    }
+
+    private void validateLastPosition(Integer lastPosition) {
+        if (lastPosition < 0) {
+            throw new IllegalArgumentException(
+                    "Last position cannot be negative"
+            );
+        }
     }
 }
