@@ -1,7 +1,10 @@
 package com.khait_academy.backend.dto.request;
 
 import com.khait_academy.backend.enums.QuestionType;
+
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+
 import lombok.Data;
 
 import java.util.List;
@@ -9,27 +12,33 @@ import java.util.List;
 @Data
 public class QuestionRequest {
 
-    // ===== QUIZ =====
+    // ================= QUIZ =================
+
     @NotNull(message = "quizId không được để trống")
     private Long quizId;
 
-    // ===== CONTENT =====
+    // ================= CONTENT =================
+
     @NotBlank(message = "content không được để trống")
     private String content;
 
-    // ===== TYPE =====
-    @NotNull(message = "type không được để trống")
-    private QuestionType type;
+    // ================= TYPE =================
+    // Optional -> default MULTIPLE_CHOICE
 
-    // ===== SCORE =====
-    @NotNull(message = "score không được để trống")
+    private QuestionType type = QuestionType.MULTIPLE_CHOICE;
+
+    // ================= SCORE =================
+    // Optional -> default 1
+
     @Min(value = 1, message = "score phải >= 1")
-    private Integer score;
+    private Integer score = 1;
 
-    // ===== OPTIONS =====
+    // ================= OPTIONS =================
+
+    @Valid
     private List<QuestionOptionRequest> options;
 
-    // ===== CORRECT ANSWERS =====
-    // 👉 dùng option index hoặc flag trong option (recommended)
+    // ================= CORRECT ANSWERS =================
+
     private List<Integer> correctIndexes;
 }

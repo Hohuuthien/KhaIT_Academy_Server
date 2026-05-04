@@ -6,7 +6,10 @@ import lombok.Data;
 @Data
 @Builder
 public class QuestionOptionResponse {
+
     private Long id;
+
     private String content;
-    private Boolean isCorrect;
+
+    private boolean correct;
 }
