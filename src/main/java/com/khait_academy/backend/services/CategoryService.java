@@ -3,9 +3,13 @@ package com.khait_academy.backend.services;
 import com.khait_academy.backend.dto.request.CategoryRequest;
 import com.khait_academy.backend.dto.response.CategoryResponse;
 import com.khait_academy.backend.entities.Category;
+import com.khait_academy.backend.exception.BadRequestException;
+import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.CategoryMapper;
 import com.khait_academy.backend.repositories.CategoryRepository;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,65 +17,46 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
 
-    /**
-     * CREATE
-     */
-    @Transactional
+    // ================= CREATE =================
     public CategoryResponse create(CategoryRequest request) {
 
-        if (categoryRepository.existsBySlug(request.getSlug())) {
-            throw new RuntimeException("Slug already exists");
-        }
+        validateSlugUnique(request.getSlug(), null);
 
         Category category = CategoryMapper.toEntity(request);
 
-        // set parent
-        if (request.getParentId() != null) {
-            Category parent = categoryRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new RuntimeException("Parent category not found"));
-            category.setParent(parent);
-        }
+        category.setParent(resolveParent(request.getParentId(), null));
 
-        Category saved = categoryRepository.save(category);
-        return CategoryMapper.toResponse(saved);
+        return CategoryMapper.toResponse(
+                categoryRepository.save(category)
+        );
     }
 
-    /**
-     * GET ALL ROOT (tree level 1)
-     * ⚠️ full tree nên build service nếu cần sâu hơn
-     */
+    // ================= GET ALL ROOT =================
     @Transactional(readOnly = true)
     public List<CategoryResponse> getAll() {
+
         return categoryRepository.findByParentIsNull()
                 .stream()
                 .map(CategoryMapper::toResponse)
                 .toList();
     }
 
-    /**
-     * GET BY ID
-     */
+    // ================= GET BY ID =================
     @Transactional(readOnly = true)
     public CategoryResponse getById(Long id) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
-
-        return CategoryMapper.toResponse(category);
+        return CategoryMapper.toResponse(getCategory(id));
     }
 
-    /**
-     * GET CHILDREN ONLY
-     */
+    // ================= GET CHILDREN =================
     @Transactional(readOnly = true)
     public List<CategoryResponse> getChildren(Long parentId) {
 
-        if (!categoryRepository.existsById(parentId)) {
-            throw new RuntimeException("Category not found");
-        }
+        getCategory(parentId); // validate tồn tại
 
         return categoryRepository.findByParentId(parentId)
                 .stream()
@@ -79,58 +64,79 @@ public class CategoryService {
                 .toList();
     }
 
-    /**
-     * UPDATE
-     */
-    @Transactional
+    // ================= UPDATE =================
     public CategoryResponse update(Long id, CategoryRequest request) {
 
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+        Category category = getCategory(id);
 
-        if (!category.getSlug().equals(request.getSlug())
-                && categoryRepository.existsBySlug(request.getSlug())) {
-            throw new RuntimeException("Slug already exists");
-        }
+        validateSlugUnique(request.getSlug(), id);
 
         CategoryMapper.updateEntity(category, request);
 
-        // parent update
-        if (request.getParentId() != null) {
+        category.setParent(resolveParent(request.getParentId(), id));
 
-            if (request.getParentId().equals(id)) {
-                throw new RuntimeException("Category cannot be its own parent");
-            }
-
-            Category parent = categoryRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new RuntimeException("Parent category not found"));
-
-            category.setParent(parent);
-
-        } else {
-            category.setParent(null);
-        }
-
-        Category updated = categoryRepository.save(category);
-        return CategoryMapper.toResponse(updated);
+        return CategoryMapper.toResponse(
+                categoryRepository.save(category)
+        );
     }
 
-    /**
-     * DELETE (SAFE VERSION)
-     */
-    @Transactional
+    // ================= DELETE =================
     public void delete(Long id) {
 
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+        Category category = getCategory(id);
 
-        // check children bằng query thay vì lazy load
-        List<Category> children = categoryRepository.findByParentId(id);
-
-        if (!children.isEmpty()) {
-            throw new RuntimeException("Cannot delete category with subcategories");
+        if (categoryRepository.existsByParentId(id)) {
+            throw new BadRequestException("Cannot delete category with subcategories");
         }
 
         categoryRepository.delete(category);
+    }
+
+    // ================= HELPER =================
+
+    private Category getCategory(Long id) {
+        return categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+    }
+
+    private void validateSlugUnique(String slug, Long excludeId) {
+
+        boolean exists = (excludeId == null)
+                ? categoryRepository.existsBySlug(slug)
+                : categoryRepository.existsBySlugAndIdNot(slug, excludeId);
+
+        if (exists) {
+            throw new BadRequestException("Slug already exists");
+        }
+    }
+
+    private Category resolveParent(Long parentId, Long currentId) {
+
+        if (parentId == null) return null;
+
+        if (parentId.equals(currentId)) {
+            throw new BadRequestException("Category cannot be its own parent");
+        }
+
+        Category parent = getCategory(parentId);
+
+        // 🔥 CHECK CYCLE (quan trọng)
+        if (isCycle(parent, currentId)) {
+            throw new BadRequestException("Invalid parent (cycle detected)");
+        }
+
+        return parent;
+    }
+
+    private boolean isCycle(Category parent, Long currentId) {
+
+        while (parent != null) {
+            if (parent.getId().equals(currentId)) {
+                return true;
+            }
+            parent = parent.getParent();
+        }
+
+        return false;
     }
 }
