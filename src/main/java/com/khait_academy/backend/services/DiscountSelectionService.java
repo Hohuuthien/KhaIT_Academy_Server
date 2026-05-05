@@ -22,53 +22,58 @@ public class DiscountSelectionService {
     private final DiscountRepository discountRepository;
 
     // ================= BEST DISCOUNT =================
-
     public Optional<Discount> getBestDiscount(Long courseId, BigDecimal price) {
 
-        List<Discount> discounts = discountRepository.findValidDiscounts(
-                courseId,
-                LocalDateTime.now()
-        );
+        BigDecimal safePrice = safePrice(price);
+        LocalDateTime now = LocalDateTime.now();
 
-        return discounts.stream()
+        return discountRepository.findValidDiscounts(courseId, now)
+                .stream()
                 .min(Comparator.comparing(d ->
-                        DiscountCalculator.apply(price, d)
+                        DiscountCalculator.apply(safePrice, d)
                 ));
     }
 
+    // ================= MAP BEST DISCOUNT =================
     public Map<Long, Discount> getBestDiscountMap(
-        List<Long> courseIds,
-        Map<Long, BigDecimal> priceMap
+            List<Long> courseIds,
+            Map<Long, BigDecimal> priceMap
     ) {
 
-    List<Discount> discounts =
-            discountRepository.findValidDiscountsByCourseIds(
-                    courseIds,
-                    LocalDateTime.now()
-            );
+        LocalDateTime now = LocalDateTime.now();
 
-    return discounts.stream()
-            .collect(Collectors.groupingBy(d -> d.getCourse().getId()))
-            .entrySet()
-            .stream()
-            .collect(Collectors.toMap(
-                    Map.Entry::getKey,
-                    entry -> entry.getValue().stream()
-                            .min(Comparator.comparing(d ->
-                                    DiscountCalculator.apply(
-                                            priceMap.get(entry.getKey()),
-                                            d
-                                    )
-                            ))
-                            .orElse(null)
-            ));
+        List<Discount> discounts =
+                discountRepository.findValidDiscountsByCourseIds(courseIds, now);
+
+        return discounts.stream()
+                .collect(Collectors.groupingBy(d -> d.getCourse().getId()))
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().stream()
+                                .min(Comparator.comparing(d ->
+                                        DiscountCalculator.apply(
+                                                safePrice(priceMap.get(entry.getKey())),
+                                                d
+                                        )
+                                ))
+                                .orElse(null) // có thể giữ hoặc filter phía dưới
+                ));
     }
-    // ================= FINAL PRICE =================
 
+    // ================= FINAL PRICE =================
     public BigDecimal getFinalPrice(Long courseId, BigDecimal price) {
 
-        return getBestDiscount(courseId, price)
-                .map(discount -> DiscountCalculator.apply(price, discount))
-                .orElse(price);
+        BigDecimal safePrice = safePrice(price);
+
+        return getBestDiscount(courseId, safePrice)
+                .map(d -> DiscountCalculator.apply(safePrice, d))
+                .orElse(safePrice);
+    }
+
+    // ================= HELPER =================
+    private BigDecimal safePrice(BigDecimal price) {
+        return price == null ? BigDecimal.ZERO : price;
     }
 }

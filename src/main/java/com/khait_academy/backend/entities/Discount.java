@@ -35,19 +35,17 @@ public class Discount {
     private Course course;
 
     // ===== DISCOUNT INFO =====
-
     @NotNull(message = "Discount value không được null")
     @DecimalMin(value = "0.0", inclusive = false, message = "Discount phải > 0")
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal value; // FIXED: tiền | PERCENT: %
+    private BigDecimal value;
 
     @NotNull(message = "Discount type không được null")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private DiscountType type; // PERCENT / FIXED
+    private DiscountType type;
 
     // ===== TIME =====
-
     @NotNull(message = "startDate không được null")
     @Column(name = "start_date", nullable = false)
     private LocalDateTime startDate;
@@ -57,23 +55,17 @@ public class Discount {
     private LocalDateTime endDate;
 
     // ===== STATUS =====
-
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
-    private Boolean isActive;
+    private Boolean isActive = true; 
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     // ================= LIFECYCLE =================
-
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
-
-        if (this.isActive == null) {
-            this.isActive = true;
-        }
-
         validateLogic();
     }
 
@@ -83,26 +75,27 @@ public class Discount {
     }
 
     // ================= BUSINESS VALIDATION =================
-
     private void validateLogic() {
 
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new IllegalArgumentException("startDate phải <= endDate");
         }
 
-        if (type == DiscountType.PERCENT) {
-            if (value.compareTo(BigDecimal.valueOf(100)) > 0) {
-                throw new IllegalArgumentException("Discount % không được > 100");
-            }
+        if (value == null) {
+            throw new IllegalArgumentException("Discount value không được null");
         }
 
         if (value.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Discount phải > 0");
         }
+
+        if (type == DiscountType.PERCENT &&
+                value.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException("Discount % không được > 100");
+        }
     }
 
     // ================= HELPER =================
-
     public boolean isValidNow() {
         LocalDateTime now = LocalDateTime.now();
 

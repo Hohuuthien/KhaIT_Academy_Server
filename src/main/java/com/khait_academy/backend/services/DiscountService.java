@@ -5,6 +5,8 @@ import com.khait_academy.backend.dto.response.DiscountResponse;
 import com.khait_academy.backend.entities.Course;
 import com.khait_academy.backend.entities.Discount;
 import com.khait_academy.backend.enums.DiscountType;
+import com.khait_academy.backend.exception.BadRequestException;
+import com.khait_academy.backend.exception.ResourceNotFoundException;
 import com.khait_academy.backend.mapper.DiscountMapper;
 import com.khait_academy.backend.repositories.CourseRepository;
 import com.khait_academy.backend.repositories.DiscountRepository;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -27,32 +30,35 @@ public class DiscountService {
 
     private final DiscountRepository discountRepository;
     private final CourseRepository courseRepository;
+    private final DiscountSelectionService discountSelectionService; // ✅ dùng service này
 
     // ================= CREATE =================
-
     public DiscountResponse create(DiscountRequest request) {
 
         Course course = getCourse(request.getCourseId());
 
+        validateRequest(request);
         validateOverlap(course.getId(), request.getStartDate(), request.getEndDate());
 
         Discount discount = DiscountMapper.toEntity(request, course);
 
-        Discount saved = discountRepository.save(discount);
+        if (discount.getIsActive() == null) {
+            discount.setIsActive(true);
+        }
 
         log.info("Create discount: courseId={}, value={}, type={}",
                 course.getId(), request.getValue(), request.getType());
 
-        return DiscountMapper.toResponse(saved);
+        return DiscountMapper.toResponse(discountRepository.save(discount));
     }
 
     // ================= UPDATE =================
-
     public DiscountResponse update(Long id, DiscountRequest request) {
 
         Discount discount = getDiscount(id);
-
         Course course = getCourse(request.getCourseId());
+
+        validateRequest(request);
 
         boolean overlap = discountRepository.existsOverlappingDiscountExcludeSelf(
                 id,
@@ -62,7 +68,7 @@ public class DiscountService {
         );
 
         if (overlap) {
-            throw new RuntimeException("Discount bị trùng thời gian");
+            throw new BadRequestException("Discount time overlap");
         }
 
         DiscountMapper.update(discount, request, course);
@@ -71,16 +77,12 @@ public class DiscountService {
     }
 
     // ================= DELETE =================
-
     public void delete(Long id) {
-        if (!discountRepository.existsById(id)) {
-            throw new RuntimeException("Discount not found");
-        }
-        discountRepository.deleteById(id);
+        Discount discount = getDiscount(id);
+        discountRepository.delete(discount);
     }
 
     // ================= GET =================
-
     public DiscountResponse getById(Long id) {
         return DiscountMapper.toResponse(getDiscount(id));
     }
@@ -99,107 +101,59 @@ public class DiscountService {
                 .toList();
     }
 
-    // ================= CORE: FINAL PRICE =================
-
+    // ================= FINAL PRICE =================
     public BigDecimal getFinalPrice(Long courseId) {
 
         Course course = getCourse(courseId);
 
-        BigDecimal original = safePrice(course.getPrice());
-
-        Discount best = findBestDiscount(courseId);
-
-        if (best == null || !best.isValidNow()) {
-            return original;
-        }
-
-        return applyDiscount(original, best);
+        return discountSelectionService.getFinalPrice(
+                course.getId(),
+                course.getPrice()
+        );
     }
 
-    public BigDecimal getFinalPrice(Course course) {
-
-        BigDecimal original = safePrice(course.getPrice());
-
-        Discount best = findBestDiscount(course.getId());
-
-        if (best == null || !best.isValidNow()) {
-            return original;
-        }
-
-        return applyDiscount(original, best);
+    // ================= HELPERS =================
+    private Course getCourse(Long id) {
+        return courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
     }
 
-    // ================= BEST DISCOUNT (OPTIMIZED) =================
-
-    private Discount findBestDiscount(Long courseId) {
-
-        List<Discount> discounts =
-                discountRepository.findValidDiscounts(courseId, LocalDateTime.now());
-
-        return discounts.stream()
-                .max((a, b) -> compareDiscountValue(a, b))
-                .orElse(null);
-    }
-
-    private int compareDiscountValue(Discount a, Discount b) {
-
-        BigDecimal valA = calculateDiscountValue(a);
-        BigDecimal valB = calculateDiscountValue(b);
-
-        return valA.compareTo(valB);
-    }
-
-    // ================= CALCULATION =================
-
-    private BigDecimal calculateDiscountValue(Discount d) {
-
-        if (d.getType() == DiscountType.PERCENT) {
-            return d.getValue(); // % so sánh trực tiếp
-        }
-
-        // FIXED → cần normalize (giả định scale 1000 để so sánh)
-        return d.getValue().multiply(BigDecimal.valueOf(10));
-    }
-
-    private BigDecimal applyDiscount(BigDecimal price, Discount d) {
-
-        return switch (d.getType()) {
-
-            case PERCENT -> price.subtract(
-                    price.multiply(d.getValue())
-                            .divide(BigDecimal.valueOf(100))
-            );
-
-            case FIXED -> price.subtract(d.getValue());
-
-            default -> price;
-        };
-    }
-
-    private BigDecimal safePrice(BigDecimal price) {
-        return price == null ? BigDecimal.ZERO : price;
+    private Discount getDiscount(Long id) {
+        return discountRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Discount not found"));
     }
 
     // ================= VALIDATION =================
+    private void validateRequest(DiscountRequest r) {
+
+        if (r.getStartDate() == null || r.getEndDate() == null) {
+            throw new BadRequestException("Start date and end date are required");
+        }
+
+        if (r.getStartDate().isAfter(r.getEndDate())) {
+            throw new BadRequestException("Start date must be before end date");
+        }
+
+        if (r.getValue() == null || r.getValue().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Discount value must be positive");
+        }
+
+        if (r.getType() == null) {
+            throw new BadRequestException("Discount type is required");
+        }
+
+        if (r.getType() == DiscountType.PERCENT &&
+                r.getValue().compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new BadRequestException("Percent cannot exceed 100");
+        }
+    }
 
     private void validateOverlap(Long courseId,
                                  LocalDateTime start,
                                  LocalDateTime end) {
 
         if (discountRepository.existsOverlappingDiscount(courseId, start, end)) {
-            throw new RuntimeException("Discount bị trùng thời gian");
+            throw new BadRequestException("Discount time overlap");
         }
-    }
-
-    // ================= HELPERS =================
-
-    private Course getCourse(Long id) {
-        return courseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Course not found"));
-    }
-
-    private Discount getDiscount(Long id) {
-        return discountRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Discount not found"));
     }
 }

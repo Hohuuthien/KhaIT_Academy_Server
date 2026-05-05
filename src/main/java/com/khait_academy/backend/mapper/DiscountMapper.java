@@ -7,27 +7,40 @@ import com.khait_academy.backend.entities.Discount;
 
 public class DiscountMapper {
 
+    // ================= CREATE =================
     public static Discount toEntity(DiscountRequest request, Course course) {
+
+        Boolean isActive = request.getIsActive() != null
+                ? request.getIsActive()
+                : true; 
+
         return Discount.builder()
                 .course(course)
                 .value(request.getValue())
                 .type(request.getType())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
-                .isActive(request.getIsActive())
+                .isActive(isActive) 
                 .build();
     }
 
+    // ================= UPDATE =================
     public static void update(Discount discount, DiscountRequest request, Course course) {
+
         discount.setCourse(course);
         discount.setValue(request.getValue());
         discount.setType(request.getType());
         discount.setStartDate(request.getStartDate());
         discount.setEndDate(request.getEndDate());
-        discount.setIsActive(request.getIsActive());
+
+        if (request.getIsActive() != null) {
+            discount.setIsActive(request.getIsActive());
+        }
     }
 
+    // ================= RESPONSE =================
     public static DiscountResponse toResponse(Discount discount) {
+
         return DiscountResponse.builder()
                 .id(discount.getId())
                 .courseId(discount.getCourse().getId())
