@@ -11,10 +11,10 @@ import com.khait_academy.backend.repositories.LessonRepository;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -27,8 +27,7 @@ public class AssignmentService {
     // ================= CREATE =================
     public AssignmentResponse create(AssignmentRequest request) {
 
-        Lesson lesson = lessonRepository.findById(request.getLessonId())
-                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
+        Lesson lesson = getLesson(request.getLessonId());
 
         Assignment assignment = AssignmentMapper.toEntity(request, lesson);
 
@@ -39,35 +38,31 @@ public class AssignmentService {
 
     // ================= GET ALL =================
     @Transactional(readOnly = true)
-    public List<AssignmentResponse> getAll() {
-        return assignmentRepository.findAll()
-                .stream()
-                .map(AssignmentMapper::toResponse)
-                .toList();
+    public Page<AssignmentResponse> getAll(Pageable pageable) {
+
+        return assignmentRepository.findAll(pageable)
+                .map(AssignmentMapper::toResponse);
     }
 
     // ================= GET BY ID =================
     @Transactional(readOnly = true)
     public AssignmentResponse getById(Long id) {
-
-        Assignment assignment = assignmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
-
-        return AssignmentMapper.toResponse(assignment);
+        return AssignmentMapper.toResponse(getAssignment(id));
     }
 
     // ================= UPDATE =================
     public AssignmentResponse update(Long id, AssignmentRequest request) {
 
-        Assignment assignment = assignmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
+        Assignment assignment = getAssignment(id);
 
+        // update fields
         AssignmentMapper.updateEntity(assignment, request);
 
-        if (request.getLessonId() != null) {
-            Lesson lesson = lessonRepository.findById(request.getLessonId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
-            assignment.setLesson(lesson);
+        // update lesson nếu khác
+        if (request.getLessonId() != null &&
+                !request.getLessonId().equals(assignment.getLesson().getId())) {
+
+            assignment.setLesson(getLesson(request.getLessonId()));
         }
 
         return AssignmentMapper.toResponse(
@@ -77,20 +72,49 @@ public class AssignmentService {
 
     // ================= DELETE =================
     public void delete(Long id) {
-
-        Assignment assignment = assignmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
-
-        assignmentRepository.delete(assignment);
+        assignmentRepository.delete(getAssignment(id));
     }
 
     // ================= BY LESSON =================
     @Transactional(readOnly = true)
-    public List<AssignmentResponse> getByLesson(Long lessonId) {
+    public Page<AssignmentResponse> getByLesson(Long lessonId, Pageable pageable) {
 
-        return assignmentRepository.findByLessonId(lessonId)
-                .stream()
-                .map(AssignmentMapper::toResponse)
-                .toList();
+        if (!lessonRepository.existsById(lessonId)) {
+            throw new ResourceNotFoundException("Lesson not found");
+        }
+
+        return assignmentRepository.findByLessonId(lessonId, pageable)
+                .map(AssignmentMapper::toResponse);
+    }
+
+    // ================= PUBLISHED =================
+    @Transactional(readOnly = true)
+    public Page<AssignmentResponse> getPublished(Pageable pageable) {
+
+        return assignmentRepository.findByIsPublishedTrue(pageable)
+                .map(AssignmentMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AssignmentResponse> getPublishedByLesson(Long lessonId, Pageable pageable) {
+
+        if (!lessonRepository.existsById(lessonId)) {
+            throw new ResourceNotFoundException("Lesson not found");
+        }
+
+        return assignmentRepository
+                .findByLessonIdAndIsPublishedTrue(lessonId, pageable)
+                .map(AssignmentMapper::toResponse);
+    }
+
+    // ================= HELPERS =================
+    private Assignment getAssignment(Long id) {
+        return assignmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found"));
+    }
+
+    private Lesson getLesson(Long id) {
+        return lessonRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson not found"));
     }
 }

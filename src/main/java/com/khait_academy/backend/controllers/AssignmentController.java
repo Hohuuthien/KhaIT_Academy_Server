@@ -1,132 +1,111 @@
-// package com.khait_academy.backend.controllers;
+package com.khait_academy.backend.controllers;
 
-// import com.khait_academy.backend.dto.request.AssignmentRequest;
-// import com.khait_academy.backend.dto.response.ApiResponse;
-// import com.khait_academy.backend.dto.response.AssignmentResponse;
-// import com.khait_academy.backend.services.AssignmentService;
+import com.khait_academy.backend.dto.request.AssignmentRequest;
+import com.khait_academy.backend.dto.response.ApiResponse;
+import com.khait_academy.backend.dto.response.AssignmentResponse;
+import com.khait_academy.backend.services.AssignmentService;
 
-// import jakarta.validation.Valid;
-// import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import lombok.RequiredArgsConstructor;
 
-// import org.springframework.data.domain.Page;
-// import org.springframework.data.domain.Pageable;
-// import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 
-// import org.springframework.http.HttpStatus;
-// import org.springframework.http.ResponseEntity;
-// import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
 
-// @RestController
-// @RequestMapping("/api/v1/assignments")
-// @RequiredArgsConstructor
-// public class AssignmentController {
+import java.net.URI;
 
-//     private final AssignmentService assignmentService;
+@RestController
+@RequestMapping("/api/assignments")
+@RequiredArgsConstructor
+@Validated
+public class AssignmentController {
 
-//     /**
-//      * CREATE
-//      */
-//     @PostMapping
-//     public ResponseEntity<ApiResponse<AssignmentResponse>> create(
-//             @RequestBody @Valid AssignmentRequest request
-//     ) {
+    private final AssignmentService assignmentService;
 
-//         return ResponseEntity.status(HttpStatus.CREATED)
-//                 .body(
-//                         ApiResponse.<AssignmentResponse>builder()
-//                                 .success(true)
-//                                 .message("Create assignment success")
-//                                 .data(assignmentService.create(request))
-//                                 .build()
-//                 );
-//     }
+    // ================= CREATE =================
+    @PostMapping
+    public ResponseEntity<ApiResponse<AssignmentResponse>> create(
+            @Valid @RequestBody AssignmentRequest request
+    ) {
+        AssignmentResponse response = assignmentService.create(request);
 
-//     /**
-//      *  GET ALL (pagination)
-//      */
-//     @GetMapping
-//     public ResponseEntity<ApiResponse<Page<AssignmentResponse>>> getAll(
-//             @PageableDefault(size = 10, sort = "id") Pageable pageable
-//     ) {
+        return ResponseEntity
+                .created(URI.create("/api/v1/assignments/" + response.getId()))
+                .body(success("Create assignment successfully", response));
+    }
 
-//         return ResponseEntity.ok(
-//                 ApiResponse.<Page<AssignmentResponse>>builder()
-//                         .success(true)
-//                         .message("Get all assignments success")
-//                         .data(assignmentService.getAll(pageable))
-//                         .build()
-//         );
-//     }
+    // ================= GET ALL =================
+    @GetMapping
+    public ResponseEntity<ApiResponse<Page<AssignmentResponse>>> getAll(
+            @PageableDefault(size = 10, sort = "id") Pageable pageable
+    ) {
+        return ResponseEntity.ok(
+                success("Get all assignments successfully",
+                        assignmentService.getAll(pageable))
+        );
+    }
 
-//     /**
-//      *  GET BY LESSON (pagination)
-//      */
-//     @GetMapping("/lesson/{lessonId}")
-//     public ResponseEntity<ApiResponse<Page<AssignmentResponse>>> getByLesson(
-//             @PathVariable Long lessonId,
-//             @PageableDefault(size = 10, sort = "id") Pageable pageable
-//     ) {
+    // ================= GET BY LESSON =================
+    @GetMapping("/lesson/{lessonId}")
+    public ResponseEntity<ApiResponse<Page<AssignmentResponse>>> getByLesson(
+            @PathVariable @Min(1) Long lessonId,
+            @PageableDefault(size = 10, sort = "id") Pageable pageable
+    ) {
+        return ResponseEntity.ok(
+                success("Get assignments by lesson successfully",
+                        assignmentService.getByLesson(lessonId, pageable))
+        );
+    }
 
-//         return ResponseEntity.ok(
-//                 ApiResponse.<Page<AssignmentResponse>>builder()
-//                         .success(true)
-//                         .message("Get assignments by lesson success")
-//                         .data(assignmentService.getByLesson(lessonId, pageable))
-//                         .build()
-//         );
-//     }
+    // ================= GET BY ID =================
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<AssignmentResponse>> getById(
+            @PathVariable @Min(1) Long id
+    ) {
+        return ResponseEntity.ok(
+                success("Get assignment successfully",
+                        assignmentService.getById(id))
+        );
+    }
 
-//     /**
-//      *  GET BY ID
-//      */
-//     @GetMapping("/{id}")
-//     public ResponseEntity<ApiResponse<AssignmentResponse>> getById(
-//             @PathVariable Long id
-//     ) {
+    // ================= UPDATE =================
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<AssignmentResponse>> update(
+            @PathVariable @Min(1) Long id,
+            @Valid @RequestBody AssignmentRequest request
+    ) {
+        return ResponseEntity.ok(
+                success("Update assignment successfully",
+                        assignmentService.update(id, request))
+        );
+    }
 
-//         return ResponseEntity.ok(
-//                 ApiResponse.<AssignmentResponse>builder()
-//                         .success(true)
-//                         .message("Get assignment success")
-//                         .data(assignmentService.getById(id))
-//                         .build()
-//         );
-//     }
+    // ================= DELETE =================
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable @Min(1) Long id
+    ) {
+        assignmentService.delete(id);
+        return ResponseEntity.ok(
+            ApiResponse.<Void>builder()
+                .success(true)
+                .message("Delete assignment successful")
+                .data(null)
+                .build()   
+        );
+    }
 
-//     /**
-//      *  UPDATE
-//      */
-//     @PutMapping("/{id}")
-//     public ResponseEntity<ApiResponse<AssignmentResponse>> update(
-//             @PathVariable Long id,
-//             @RequestBody @Valid AssignmentRequest request
-//     ) {
-
-//         return ResponseEntity.ok(
-//                 ApiResponse.<AssignmentResponse>builder()
-//                         .success(true)
-//                         .message("Update assignment success")
-//                         .data(assignmentService.update(id, request))
-//                         .build()
-//         );
-//     }
-
-//     /**
-//      *  DELETE
-//      */
-//     @DeleteMapping("/{id}")
-//     public ResponseEntity<ApiResponse<Void>> delete(
-//             @PathVariable Long id
-//     ) {
-
-//         assignmentService.delete(id);
-
-//         return ResponseEntity.status(HttpStatus.NO_CONTENT)
-//                 .body(
-//                         ApiResponse.<Void>builder()
-//                                 .success(true)
-//                                 .message("Delete assignment success")
-//                                 .build()
-//                 );
-//     }
-// }
+    // ================= COMMON RESPONSE =================
+    private <T> ApiResponse<T> success(String message, T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .message(message)
+                .data(data)
+                .build();
+    }
+}
