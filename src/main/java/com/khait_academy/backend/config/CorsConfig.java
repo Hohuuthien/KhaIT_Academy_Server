@@ -14,37 +14,41 @@ public class CorsConfig {
 
         CorsConfiguration config = new CorsConfiguration();
 
-        // ===== ORIGINS =====
-        config.setAllowedOriginPatterns(List.of(
+        // ================= ORIGINS =================
+        config.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://localhost:5173",
-                "https://*.khait-academy.com" // production domain
+                "https://khait-academy.com",
+                "https://admin.khait-academy.com"
         ));
 
-        // ===== METHODS =====
+        // ================= METHODS =================
         config.setAllowedMethods(List.of(
-                "GET", "POST", "PUT", "DELETE", "OPTIONS"
+                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
 
-        // ===== HEADERS =====
+        // ================= HEADERS =================
         config.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
-                "X-Requested-With"
+                "X-Requested-With",
+                "Accept"
         ));
 
-        // ===== EXPOSE =====
+        // ================= EXPOSE HEADERS =================
         config.setExposedHeaders(List.of(
                 "Authorization"
         ));
 
-        // ===== CREDENTIAL =====
+        // ================= CREDENTIAL =================
         config.setAllowCredentials(true);
 
-        // ===== CACHE PREFLIGHT =====
-        config.setMaxAge(3600L); // 1h
+        // ================= PREFLIGHT CACHE =================
+        config.setMaxAge(3600L);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", config);
 
         return source;
