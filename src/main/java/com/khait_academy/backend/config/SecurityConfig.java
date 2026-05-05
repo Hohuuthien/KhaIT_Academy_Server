@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 import static com.khait_academy.backend.constants.SecurityEndpoints.*;
 
 @Configuration
@@ -35,11 +36,11 @@ public class SecurityConfig {
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtAuthenticationFilter jwtAuthFilter;
 
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
+            .cors(cors -> {})
             .csrf(csrf -> csrf.disable())
 
             .sessionManagement(session ->
@@ -48,14 +49,14 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
 
-                // PUBLIC
+                // ================= PUBLIC =================
                 .requestMatchers(PUBLIC).permitAll()
                 .requestMatchers(HttpMethod.GET, PUBLIC_GET).permitAll()
 
-                // AUTHENTICATED
+                // ================= ENROLLMENT =================
                 .requestMatchers(ENROLLMENT).authenticated()
 
-                // COURSE
+                // ================= COURSE =================
                 .requestMatchers(HttpMethod.POST, COURSE)
                     .hasAnyRole("TEACHER", "ADMIN")
                 .requestMatchers(HttpMethod.PUT, COURSE)
@@ -63,7 +64,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, COURSE)
                     .hasRole("ADMIN")
 
-                // LESSON
+                // ================= LESSON =================
                 .requestMatchers(HttpMethod.POST, LESSON)
                     .hasAnyRole("TEACHER", "ADMIN")
                 .requestMatchers(HttpMethod.PUT, LESSON)
@@ -71,7 +72,37 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, LESSON)
                     .hasRole("ADMIN")
 
-                // ADMIN
+                // ================= ASSIGNMENT =================
+                .requestMatchers(HttpMethod.GET, ASSIGNMENT)
+                    .authenticated() // student xem
+                .requestMatchers(HttpMethod.POST, ASSIGNMENT)
+                    .hasAnyRole("TEACHER", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, ASSIGNMENT)
+                    .hasAnyRole("TEACHER", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, ASSIGNMENT)
+                    .hasRole("ADMIN")
+
+                // ================= DISCOUNT =================
+                .requestMatchers(HttpMethod.GET, DISCOUNT)
+                    .permitAll() // ai cũng xem được giá
+                .requestMatchers(HttpMethod.POST, DISCOUNT)
+                    .hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, DISCOUNT)
+                    .hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, DISCOUNT)
+                    .hasRole("ADMIN")
+
+                // ================= TEACHER =================
+                .requestMatchers(HttpMethod.GET, TEACHER)
+                    .hasAnyRole("ADMIN", "TEACHER")
+                .requestMatchers(HttpMethod.POST, TEACHER)
+                    .hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, TEACHER)
+                    .hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, TEACHER)
+                    .hasRole("ADMIN")
+
+                // ================= ADMIN =================
                 .requestMatchers(ADMIN).hasRole("ADMIN")
 
                 .anyRequest().authenticated()
@@ -83,7 +114,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // ===== AUTH PROVIDER =====
+    // ================= AUTH PROVIDER =================
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
@@ -94,13 +125,13 @@ public class SecurityConfig {
         return provider;
     }
 
-    // ===== PASSWORD ENCODER =====
+    // ================= PASSWORD =================
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12); // tăng strength
+        return new BCryptPasswordEncoder(12);
     }
 
-    // ===== AUTH MANAGER =====
+    // ================= AUTH MANAGER =================
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
             throws Exception {

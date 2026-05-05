@@ -16,7 +16,7 @@ public class JwtConfig {
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${app.jwt.base64:true}") // mặc định dùng base64
+    @Value("${app.jwt.base64:true}") 
     private boolean isBase64;
 
     @Bean
@@ -25,14 +25,11 @@ public class JwtConfig {
         byte[] keyBytes;
 
         if (isBase64) {
-            // ✅ decode base64
             keyBytes = Decoders.BASE64.decode(jwtSecret);
         } else {
-            // ✅ fallback: raw string
             keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
         }
 
-        // 🔥 CHECK CHUẨN HS256
         if (keyBytes.length < 32) {
             throw new IllegalArgumentException(
                     "JWT secret must be at least 256 bits (32 bytes). Current: " + keyBytes.length + " bytes"
