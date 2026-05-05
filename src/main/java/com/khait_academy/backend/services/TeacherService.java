@@ -13,7 +13,6 @@ import com.khait_academy.backend.repositories.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,111 +29,105 @@ public class TeacherService {
     // ================= CREATE =================
     public TeacherResponse create(TeacherRequest request) {
 
-        // check user exists
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found")
-                );
+        User user = getUser(request.getUserId());
 
-        // check duplicate teacher
-        if (teacherRepository.existsByUserId(user.getId())) {
-            throw new BadRequestException("Teacher already exists for this user");
-        }
+        validateTeacherNotExists(user.getId());
 
         Teacher teacher = TeacherMapper.toEntity(request, user);
 
-        return TeacherMapper.toResponse(
-                teacherRepository.save(teacher)
-        );
+        return toResponse(teacherRepository.save(teacher));
     }
 
     // ================= GET ALL =================
     @Transactional(readOnly = true)
     public List<TeacherResponse> getAll() {
-
         return teacherRepository.findAll()
                 .stream()
-                .map(TeacherMapper::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
     // ================= GET BY ID =================
     @Transactional(readOnly = true)
     public TeacherResponse getById(Long id) {
-
-        Teacher teacher = teacherRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Teacher not found")
-                );
-
-        return TeacherMapper.toResponse(teacher);
+        return toResponse(getTeacher(id));
     }
 
     // ================= UPDATE =================
     public TeacherResponse update(Long id, TeacherRequest request) {
 
-        Teacher teacher = teacherRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Teacher not found")
-                );
+        Teacher teacher = getTeacher(id);
 
         User user = null;
 
         if (request.getUserId() != null) {
-            user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException("User not found")
-                    );
+            user = getUser(request.getUserId());
+
+            // 🔥 check duplicate khi đổi user
+            if (!user.getId().equals(teacher.getUser().getId())) {
+                validateTeacherNotExists(user.getId());
+            }
         }
 
         TeacherMapper.updateEntity(teacher, request, user);
 
-        return TeacherMapper.toResponse(
-                teacherRepository.save(teacher)
-        );
+        return toResponse(teacherRepository.save(teacher));
     }
 
     // ================= DELETE =================
     public void delete(Long id) {
-
-        Teacher teacher = teacherRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Teacher not found")
-                );
-
-        teacherRepository.delete(teacher);
+        if (!teacherRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Teacher not found");
+        }
+        teacherRepository.deleteById(id);
     }
 
     // ================= CHANGE STATUS =================
     public TeacherResponse changeStatus(Long id, String status) {
 
-        Teacher teacher = teacherRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Teacher not found")
-                );
+        Teacher teacher = getTeacher(id);
 
-        try {
-            teacher.setStatus(
-                    TeacherStatus.valueOf(status.toUpperCase())
-            );
-        } catch (Exception e) {
-            throw new BadRequestException("Invalid teacher status");
-        }
+        teacher.setStatus(parseStatus(status));
 
-        return TeacherMapper.toResponse(
-                teacherRepository.save(teacher)
-        );
+        return toResponse(teacherRepository.save(teacher));
     }
 
     // ================= GET BY USER =================
     @Transactional(readOnly = true)
     public TeacherResponse getByUserId(Long userId) {
-
-        Teacher teacher = teacherRepository.findByUserId(userId)
+        return teacherRepository.findByUserId(userId)
+                .map(this::toResponse)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("Teacher not found for user")
-                );
+                        new ResourceNotFoundException("Teacher not found for user"));
+    }
 
+    // ================= PRIVATE METHODS =================
+
+    private Teacher getTeacher(Long id) {
+        return teacherRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found"));
+    }
+
+    private User getUser(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private void validateTeacherNotExists(Long userId) {
+        if (teacherRepository.existsByUserId(userId)) {
+            throw new BadRequestException("Teacher already exists for this user");
+        }
+    }
+
+    private TeacherStatus parseStatus(String status) {
+        try {
+            return TeacherStatus.valueOf(status.toUpperCase());
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid teacher status");
+        }
+    }
+
+    private TeacherResponse toResponse(Teacher teacher) {
         return TeacherMapper.toResponse(teacher);
     }
 }
