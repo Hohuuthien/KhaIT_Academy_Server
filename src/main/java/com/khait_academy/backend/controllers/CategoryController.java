@@ -4,108 +4,103 @@ import com.khait_academy.backend.dto.request.CategoryRequest;
 import com.khait_academy.backend.dto.response.ApiResponse;
 import com.khait_academy.backend.dto.response.CategoryResponse;
 import com.khait_academy.backend.services.CategoryService;
+
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
+@Validated
 public class CategoryController {
 
     private final CategoryService categoryService;
 
-    /**
-     * CREATE CATEGORY
-     */
+    // ================= CREATE =================
     @PostMapping
     public ResponseEntity<ApiResponse<CategoryResponse>> create(
-            @RequestBody @Valid CategoryRequest request
+            @Valid @RequestBody CategoryRequest request
     ) {
-        return ResponseEntity.status(201).body(
-                ApiResponse.<CategoryResponse>builder()
-                        .success(true)
-                        .message("Create category success")
-                        .data(categoryService.create(request))
-                        .build()
-        );
+        CategoryResponse response = categoryService.create(request);
+
+        return ResponseEntity
+                .created(URI.create("/api/categories/" + response.getId()))
+                .body(success("Create category successfully", response));
     }
 
-    /**
-     * GET ALL ROOT TREE
-     */
+    // ================= GET ALL ROOT =================
     @GetMapping
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAll() {
-
         return ResponseEntity.ok(
-                ApiResponse.<List<CategoryResponse>>builder()
-                        .success(true)
-                        .message("Get categories tree success")
-                        .data(categoryService.getAll())
-                        .build()
+                success("Get categories tree successfully",
+                        categoryService.getAll())
         );
     }
 
-    /**
-     * GET BY ID
-     */
+    // ================= GET BY ID =================
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> getById(
-            @PathVariable Long id
+            @PathVariable @Min(1) Long id
     ) {
         return ResponseEntity.ok(
-                ApiResponse.<CategoryResponse>builder()
-                        .success(true)
-                        .message("Get category success")
-                        .data(categoryService.getById(id))
-                        .build()
+                success("Get category successfully",
+                        categoryService.getById(id))
         );
     }
 
-    /**
-     * UPDATE
-     */
+    // ================= UPDATE =================
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<CategoryResponse>> update(
-            @PathVariable Long id,
-            @RequestBody @Valid CategoryRequest request
+            @PathVariable @Min(1) Long id,
+            @Valid @RequestBody CategoryRequest request
     ) {
         return ResponseEntity.ok(
-                ApiResponse.<CategoryResponse>builder()
-                        .success(true)
-                        .message("Update category success")
-                        .data(categoryService.update(id, request))
-                        .build()
+                success("Update category successfully",
+                        categoryService.update(id, request))
         );
     }
 
-    /**
-     * DELETE (REST STANDARD = 204)
-     */
+    // ================= DELETE =================
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
-            @PathVariable Long id
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable @Min(1) Long id
     ) {
         categoryService.delete(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * GET CHILDREN
-     */
-    @GetMapping("/{id}/children")
-    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getChildren(
-            @PathVariable Long id
-    ) {
         return ResponseEntity.ok(
-                ApiResponse.<List<CategoryResponse>>builder()
+                ApiResponse.<Void>builder()
                         .success(true)
-                        .message("Get children success")
-                        .data(categoryService.getChildren(id))
+                        .message("Delete category successfull")
+                        .data(null)
                         .build()
         );
+    }
+
+    // ================= GET CHILDREN =================
+    @GetMapping("/{id}/children")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getChildren(
+            @PathVariable @Min(1) Long id
+    ) {
+        return ResponseEntity.ok(
+                success("Get children successfully",
+                        categoryService.getChildren(id))
+        );
+    }
+
+    // ================= COMMON RESPONSE =================
+    private <T> ApiResponse<T> success(String message, T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .message(message)
+                .data(data)
+                .build();
     }
 }
