@@ -1,6 +1,7 @@
 package com.khait_academy.backend.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.khait_academy.backend.enums.ParentStatus;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -11,10 +12,11 @@ import java.util.Set;
 @Builder
 public class ParentResponse {
 
+    // BASIC
     private Long id;
-
-    // USER
     private Long userId;
+
+    // USER INFO
     private String fullName;
     private String email;
 
@@ -22,12 +24,12 @@ public class ParentResponse {
     private String phone;
     private String address;
 
-    // CHILDREN
-    private Integer totalStudents;
+    // RELATION
+    private int totalStudents;
     private Set<StudentResponse> students;
 
     // STATUS
-    private String status;
+    private ParentStatus status;
 
     // AUDIT
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
