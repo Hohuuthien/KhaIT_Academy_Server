@@ -1,3 +1,4 @@
+
 package com.khait_academy.backend.services;
 
 import com.khait_academy.backend.dto.request.ParentRequest;
@@ -29,17 +30,11 @@ public class ParentService {
     // ================= CREATE =================
     public ParentResponse create(ParentRequest request) {
 
-        if (parentRepository.existsByUserId(request.getUserId())) {
-            throw new BadRequestException("Parent already exists for this user");
-        }
+        validateParentNotExists(request.getUserId());
 
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found")
-                );
+        User user = getUserOrThrow(request.getUserId());
 
-        Parent parent = ParentMapper.toEntity(request);
-        parent.setUser(user);
+        Parent parent = ParentMapper.toEntity(request, user);
 
         return ParentMapper.toResponse(
                 parentRepository.save(parent)
@@ -49,7 +44,6 @@ public class ParentService {
     // ================= GET ALL =================
     @Transactional(readOnly = true)
     public List<ParentResponse> getAll() {
-
         return parentRepository.findAll()
                 .stream()
                 .map(ParentMapper::toResponse)
@@ -59,24 +53,38 @@ public class ParentService {
     // ================= GET BY ID =================
     @Transactional(readOnly = true)
     public ParentResponse getById(Long id) {
+        return ParentMapper.toResponse(getParentOrThrow(id));
+    }
 
-        Parent parent = parentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Parent not found")
-                );
-
-        return ParentMapper.toResponse(parent);
+    // ================= GET BY USER =================
+    @Transactional(readOnly = true)
+    public ParentResponse getByUserId(Long userId) {
+        return ParentMapper.toResponse(
+                parentRepository.findByUserId(userId)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException("Parent not found")
+                        )
+        );
     }
 
     // ================= UPDATE =================
     public ParentResponse update(Long id, ParentRequest request) {
 
-        Parent parent = parentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Parent not found")
-                );
+        Parent parent = getParentOrThrow(id);
 
         ParentMapper.updateEntity(parent, request);
+
+        return ParentMapper.toResponse(
+                parentRepository.save(parent)
+        );
+    }
+
+    // ================= CHANGE STATUS =================
+    public ParentResponse changeStatus(Long id, ParentStatus status) {
+
+        Parent parent = getParentOrThrow(id);
+
+        parent.setStatus(status);
 
         return ParentMapper.toResponse(
                 parentRepository.save(parent)
@@ -86,23 +94,38 @@ public class ParentService {
     // ================= DELETE =================
     public void delete(Long id) {
 
-        Parent parent = parentRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Parent not found")
-                );
+        Parent parent = getParentOrThrow(id);
+
+        if (!parent.getStudents().isEmpty()) {
+            throw new BadRequestException(
+                    "Cannot delete parent with assigned students"
+            );
+        }
 
         parentRepository.delete(parent);
     }
 
-    // ================= GET BY USER =================
-    @Transactional(readOnly = true)
-    public ParentResponse getByUserId(Long userId) {
-
-        Parent parent = parentRepository.findByUserId(userId)
+    // ================= HELPERS =================
+    private Parent getParentOrThrow(Long id) {
+        return parentRepository.findById(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Parent not found")
                 );
+    }
 
-        return ParentMapper.toResponse(parent);
+    private User getUserOrThrow(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found")
+                );
+    }
+
+    private void validateParentNotExists(Long userId) {
+        if (parentRepository.existsByUserId(userId)) {
+            throw new BadRequestException(
+                    "Parent already exists for this user"
+            );
+        }
     }
 }
+
