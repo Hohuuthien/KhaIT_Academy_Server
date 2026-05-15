@@ -5,7 +5,11 @@ import com.khait_academy.backend.enums.OrderStatus;
 import com.khait_academy.backend.enums.PaymentMethod;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -22,7 +26,10 @@ import java.util.List;
         @Index(name = "idx_order_transaction", columnList = "transaction_id")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_order_transaction", columnNames = "transaction_id")
+        @UniqueConstraint(
+            name = "uk_order_transaction",
+            columnNames = "transaction_id"
+        )
     }
 )
 @Getter
@@ -30,6 +37,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"user", "items"})
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Order {
 
@@ -38,23 +46,29 @@ public class Order {
     @EqualsAndHashCode.Include
     private Long id;
 
-    // ===== USER =====
+    // ================= USER =================
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
     private User user;
 
-    // ===== PRICE =====
-    @Column(nullable = false, precision = 12, scale = 2)
-    private BigDecimal totalPrice;
+    // ================= PRICE =================
 
-    // ===== STATUS =====
+    @DecimalMin(value = "0.0", inclusive = true)
+    @Column(nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal totalPrice = BigDecimal.ZERO;
+
+    // ================= STATUS =================
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private OrderStatus status;
-    // PENDING, PAID, CANCELLED, FAILED
+    @Builder.Default
+    private OrderStatus status = OrderStatus.PENDING;
 
-    // ===== PAYMENT =====
+    // ================= PAYMENT =================
+
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false, length = 20)
     private PaymentMethod paymentMethod;
@@ -62,14 +76,18 @@ public class Order {
     @Column(name = "transaction_id", length = 100)
     private String transactionId;
 
-    // ===== TIME =====
+    // ================= TIME =================
+
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // ===== RELATION =====
+    // ================= RELATION =================
+
     @OneToMany(
         mappedBy = "order",
         cascade = CascadeType.ALL,
@@ -78,53 +96,74 @@ public class Order {
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
 
-    // ===== HELPER =====
+    // ================= HELPER METHODS =================
 
     public void addItem(OrderItem item) {
+        if (item == null) return;
+
         items.add(item);
         item.setOrder(this);
+
         recalculateTotal();
     }
 
     public void removeItem(OrderItem item) {
+        if (item == null) return;
+
         items.remove(item);
         item.setOrder(null);
+
+        recalculateTotal();
+    }
+
+    public void clearItems() {
+        items.forEach(item -> item.setOrder(null));
+        items.clear();
+
         recalculateTotal();
     }
 
     public void recalculateTotal() {
         this.totalPrice = items.stream()
                 .map(OrderItem::getTotalPrice)
+                .filter(price -> price != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    // ================= BUSINESS METHODS =================
+
     public void markPaid(String transactionId) {
+
+        if (this.status == OrderStatus.CANCELLED) {
+            throw new IllegalStateException(
+                "Cancelled order cannot be paid"
+            );
+        }
+
         this.status = OrderStatus.PAID;
         this.transactionId = transactionId;
     }
 
     public void cancel() {
+
+        if (this.status == OrderStatus.PAID) {
+            throw new IllegalStateException(
+                "Paid order cannot be cancelled"
+            );
+        }
+
         this.status = OrderStatus.CANCELLED;
     }
 
-    // ===== LIFECYCLE =====
-
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-
-        if (this.status == null) {
-            this.status = OrderStatus.PENDING;
-        }
-
-        if (this.totalPrice == null) {
-            this.totalPrice = BigDecimal.ZERO;
-        }
+    public boolean isPaid() {
+        return this.status == OrderStatus.PAID;
     }
 
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
+    public boolean isPending() {
+        return this.status == OrderStatus.PENDING;
+    }
+
+    public boolean isCancelled() {
+        return this.status == OrderStatus.CANCELLED;
     }
 }
