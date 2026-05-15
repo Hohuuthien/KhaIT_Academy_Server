@@ -1,99 +1,72 @@
-// package com.khait_academy.backend.controllers;
+package com.khait_academy.backend.controllers;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-// import com.khait_academy.backend.dto.request.OrderRequest;
-// import com.khait_academy.backend.dto.response.ApiResponse;
-// import com.khait_academy.backend.dto.response.OrderResponse;
-// import com.khait_academy.backend.security.UserPrincipal;
-// import com.khait_academy.backend.services.OrderService;
+import com.khait_academy.backend.dto.request.OrderRequest;
+import com.khait_academy.backend.dto.response.OrderResponse;
+import com.khait_academy.backend.services.OrderService;
 
-// import jakarta.validation.Valid;
-// import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
-// import org.springframework.data.domain.Pageable;
-// import org.springframework.http.HttpStatus;
-// import org.springframework.http.ResponseEntity;
-// import org.springframework.security.core.Authentication;
-// import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
-// @RestController
-// @RequestMapping("/api/v1/orders")
-// @RequiredArgsConstructor
-// public class OrderController {
+@RestController
+@RequestMapping("/api/orders")
+@RequiredArgsConstructor
+public class OrderController {
 
-//     private final OrderService orderService;
+    private final OrderService orderService;
 
-//     // ================= CREATE ORDER =================
+    @PostMapping
+    public ResponseEntity<OrderResponse> createOrder(
+            @RequestParam Long userId,
+            @Valid @RequestBody OrderRequest request
+    ) {
 
-//     @PostMapping
-//     public ResponseEntity<ApiResponse<OrderResponse>> create(
-//             @Valid @RequestBody OrderRequest request,
-//             Authentication authentication
-//     ) {
+        return ResponseEntity.ok(
+                orderService.createOrder(userId, request)
+        );
+    }
 
-//         Long userId = extractUserId(authentication);
+    @GetMapping("/my-orders")
+    public ResponseEntity<List<OrderResponse>> getMyOrders(
+            @RequestParam Long userId
+    ) {
 
-//         OrderResponse response = orderService.createOrder(userId, request);
+        return ResponseEntity.ok(
+                orderService.getMyOrders(userId)
+        );
+    }
 
-//         return ResponseEntity.status(HttpStatus.CREATED).body(
-//                 ApiResponse.<OrderResponse>builder()
-//                         .success(true)
-//                         .message("Tạo order thành công")
-//                         .data(response)
-//                         .build()
-//         );
-//     }
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderResponse> getOrderById(
+            @PathVariable Long id
+    ) {
 
-//     // ================= MY ORDERS (PAGING) =================
+        return ResponseEntity.ok(
+                orderService.getOrderById(id)
+        );
+    }
 
-//     @GetMapping("/my")
-//     public ResponseEntity<ApiResponse<?>> myOrders(
-//             Authentication authentication,
-//             Pageable pageable
-//     ) {
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<String> cancelOrder(
+            @PathVariable Long id
+    ) {
 
-//         Long userId = extractUserId(authentication);
+        orderService.cancelOrder(id);
 
-//         var data = orderService.getMyOrders(userId, pageable);
+        return ResponseEntity.ok("Order cancelled successfully");
+    }
 
-//         return ResponseEntity.ok(
-//                 ApiResponse.builder()
-//                         .success(true)
-//                         .message("Danh sách đơn hàng")
-//                         .data(data)
-//                         .build()
-//         );
-//     }
+    @PutMapping("/{id}/paid")
+    public ResponseEntity<String> markPaid(
+            @PathVariable Long id,
+            @RequestParam String transactionId
+    ) {
 
-//     // ================= GET ALL (ADMIN) =================
+        orderService.markPaid(id, transactionId);
 
-//     @GetMapping("/admin")
-//     public ResponseEntity<ApiResponse<?>> getAll(Pageable pageable) {
-
-//         var data = orderService.getAll(pageable);
-
-//         return ResponseEntity.ok(
-//                 ApiResponse.builder()
-//                         .success(true)
-//                         .message("Danh sách tất cả orders")
-//                         .data(data)
-//                         .build()
-//         );
-//     }
-
-//     // ================= EXTRACT USER =================
-
-//     private Long extractUserId(Authentication authentication) {
-
-//         if (authentication == null || !authentication.isAuthenticated()) {
-//             throw new RuntimeException("Unauthenticated");
-//         }
-
-//         Object principal = authentication.getPrincipal();
-
-//         if (principal instanceof UserPrincipal userPrincipal) {
-//             return userPrincipal.getId();
-//         }
-
-//         throw new RuntimeException("Cannot extract userId from authentication");
-//     }
-// }
+        return ResponseEntity.ok("Order paid successfully");
+    }
+}
